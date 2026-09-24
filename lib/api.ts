@@ -24,10 +24,10 @@ const getBaseUrl = (): string => {
   if (typeof window !== 'undefined') {
     // If running in production browser on Vercel or custom domain
     if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      return 'https://byd-panel.omnisuiteai.com/api';
+      return 'https://byd-sales-floor-backend.vercel.app/api';
     }
   }
-  return 'http://localhost:5000/api';
+  return 'https://byd-sales-floor-backend.vercel.app/api';
 };
 
 const TOKEN_KEY = 'byd_crm_token';
