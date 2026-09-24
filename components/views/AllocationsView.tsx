@@ -1,0 +1,364 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import {
+  Inbox,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  UserCheck,
+  Send,
+  ArrowRight,
+  Sparkles,
+  Phone,
+  Mail,
+  ExternalLink,
+  ShieldAlert,
+  ShieldCheck,
+} from 'lucide-react';
+import { useCrm } from '@/lib/crmContext';
+import { AllocationItem, Customer } from '@/lib/types';
+import { ALL_USERS } from '@/lib/data';
+import { PaginationControls } from '@/components/ui/PaginationControls';
+
+interface AllocationsViewProps {
+  onSelectCustomer: (customer: Customer) => void;
+}
+
+export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
+  const {
+    allocations,
+    allocationsPagination,
+    fetchAllocations,
+    customers,
+    currentUser,
+    selectedSite,
+    acceptAllocation,
+    reassignAllocation,
+    requestMoreLeads,
+    addToast,
+  } = useCrm();
+
+  const [reassignModalAlloc, setReassignModalAlloc] = useState<AllocationItem | null>(null);
+  const [targetConsultant, setTargetConsultant] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const consultants = ALL_USERS.filter((u) => u.role === 'consultant');
+
+  useEffect(() => {
+    fetchAllocations({
+      page: currentPage,
+      limit: pageSize,
+      site: selectedSite !== 'All Sites' ? selectedSite : undefined,
+    });
+  }, [currentPage, pageSize, selectedSite, fetchAllocations]);
+
+  const handleReassignSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reassignModalAlloc || !targetConsultant) return;
+    reassignAllocation(reassignModalAlloc.allocation_id, targetConsultant);
+    setReassignModalAlloc(null);
+  };
+
+  return (
+    <div className="view-stack">
+      {/* Intro Header */}
+      <div className="page-intro">
+        <div>
+          <span className="eyebrow flex items-center gap-1.5 font-mono">
+            <span className="w-2 h-2 rounded-full bg-[#e60012]" />
+            Upstream Handshake · Lead Centre Intake (§5.3)
+          </span>
+          <h1 className="page-title mt-1">Allocation Inbox & SLA Queue</h1>
+          <p className="page-subtitle">
+            Pre-qualified inbound prospects pushed from Lead Centre AI and BDC. 15-minute response SLA clock starts on allocation to stop lead decay.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={requestMoreLeads}
+            className="signal-button px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md uppercase tracking-wider font-mono"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Request More Leads</span>
+          </button>
+        </div>
+      </div>
+
+      {/* AC-11 Quarantine & Production Guard Banner */}
+      <div className="p-3.5 rounded-xl bg-slate-900 text-white flex items-center justify-between text-xs shadow-sm flex-wrap gap-2">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+            <ShieldCheck className="w-4 h-4" />
+          </div>
+          <div>
+            <span className="font-bold text-white flex items-center gap-1.5">
+              Production Mode Active · Lead Centre Sandbox Quarantined (§5.10 & AC-11)
+            </span>
+            <span className="text-[11px] text-slate-300">
+              Demo-dataset records (~4,036 attachment prospects) are isolated from production CRM. Only live verified customer records are allocated to sales floor desks.
+            </span>
+          </div>
+        </div>
+        <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30">
+          Zero Bleed Guard
+        </span>
+      </div>
+
+      {/* SLA Status Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+              Pending First Touch
+            </span>
+            <div className="text-2xl font-bold text-slate-900 mt-0.5">
+              {allocations.filter((a) => a.status === 'pending').length}
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+            <Clock className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+              SLA Breaches (Escalated to Floor Mgr)
+            </span>
+            <div className="text-2xl font-bold text-red-600 mt-0.5">
+              {allocations.filter((a) => a.status === 'escalated').length}
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-red-50 text-[#e60012] flex items-center justify-center font-bold">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+              Accepted Today (Fairfield Desk)
+            </span>
+            <div className="text-2xl font-bold text-emerald-600 mt-0.5">
+              {allocations.filter((a) => a.status === 'accepted').length}
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Allocation Queue */}
+      <div className="surface-card">
+        <div className="card-header-row">
+          <div>
+            <span className="text-[10px] font-bold text-[#e60012] uppercase tracking-wider font-mono">
+              Live Inbound Stream
+            </span>
+            <h3 className="section-title text-xl">Assigned Prospects Queue</h3>
+          </div>
+          <span className="text-xs font-mono text-slate-400">
+            {allocations.length} allocated prospects
+          </span>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {allocations.map((alloc) => (
+            <div
+              key={alloc.allocation_id}
+              className={`p-5 rounded-2xl border transition-all space-y-3 ${
+                alloc.status === 'escalated'
+                  ? 'border-red-300 bg-red-50/30'
+                  : alloc.status === 'accepted'
+                  ? 'border-slate-200 bg-white'
+                  : 'border-amber-200 bg-amber-50/20'
+              }`}
+            >
+              {/* Header Info */}
+              <div className="flex items-start justify-between flex-wrap gap-2">
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h4 className="text-base font-bold text-slate-900">{alloc.prospect_name}</h4>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono">
+                      {alloc.allocation_id}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 text-[#e60012] font-mono">
+                      AI Intent: {alloc.ai_score}/100
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">
+                      Source: {alloc.source}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-600">
+                    <span className="font-mono font-medium">{alloc.phone}</span>
+                    <span>·</span>
+                    <span>{alloc.email}</span>
+                    <span>·</span>
+                    <span className="font-semibold text-slate-800">{alloc.vehicle}</span>
+                  </div>
+                </div>
+
+                {/* SLA Clock Badge (§5.3 & AC-4) */}
+                <div className="text-right">
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold font-mono ${
+                      alloc.status === 'escalated'
+                        ? 'bg-red-500 text-white animate-pulse'
+                        : alloc.status === 'accepted'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>
+                      {alloc.status === 'escalated'
+                        ? 'SLA BREACHED (Overdue)'
+                        : alloc.status === 'accepted'
+                        ? 'SLA Met · Active'
+                        : '15m SLA Window'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 block mt-1 font-mono">
+                    Allocated: {new Date(alloc.allocated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Last SMS Summary Payload */}
+              <div className="p-3.5 rounded-xl bg-white border border-slate-200 text-xs space-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                  Lead Centre Two-Way Conversation Context
+                </span>
+                <p className="text-slate-700 italic leading-relaxed">
+                  &ldquo;{alloc.last_sms_summary}&rdquo;
+                </p>
+                {alloc.appointment_booked && (
+                  <div className="pt-1 text-emerald-700 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Test Drive Scheduled: {alloc.appointment_booked}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between pt-1 flex-wrap gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">Current Owner:</span>
+                  <strong className="text-slate-900">{alloc.assigned_to}</strong>
+                  <a
+                    href={`https://byd-leads-crm.vercel.app/leads/${alloc.lead_prospect_id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#e60012] hover:underline flex items-center gap-1 font-semibold ml-2"
+                  >
+                    <span>Lead Centre Prospect</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {alloc.status !== 'accepted' && (
+                    <button
+                      onClick={() => acceptAllocation(alloc.allocation_id)}
+                      className="px-4 py-2 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-red-600/20 font-mono uppercase tracking-wider"
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      <span>Accept SLA & Own Deal</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setReassignModalAlloc(alloc);
+                      setTargetConsultant(consultants[0]?.name || '');
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs"
+                  >
+                    Reassign
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const cust = customers.find((c) => c.customer_id === alloc.customer_id);
+                      if (cust) onSelectCustomer(cust);
+                    }}
+                    className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs"
+                  >
+                    Customer 360
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        pagination={allocationsPagination}
+        currentPage={currentPage}
+        totalItems={allocationsPagination?.total ?? allocations.length}
+        pageSize={pageSize}
+        pageSizeOptions={[5, 10, 20]}
+        itemLabel="allocations"
+        onPageChange={(p) => setCurrentPage(p)}
+        onPageSizeChange={(s) => {
+          setPageSize(s);
+          setCurrentPage(1);
+        }}
+      />
+
+      {/* Reassign Modal */}
+      {reassignModalAlloc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-sm w-full p-5 space-y-4">
+            <h4 className="text-sm font-bold text-slate-900">
+              Reassign {reassignModalAlloc.prospect_name}
+            </h4>
+            <p className="text-xs text-slate-500">
+              Route lead to a different sales consultant in the Harmony network.
+            </p>
+            <form onSubmit={handleReassignSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
+                  Select Consultant
+                </label>
+                <select
+                  value={targetConsultant}
+                  onChange={(e) => setTargetConsultant(e.target.value)}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                >
+                  {consultants.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name} ({c.site})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReassignModalAlloc(null)}
+                  className="px-3 py-2 text-xs font-semibold text-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs font-mono uppercase"
+                >
+                  Confirm Route
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
