@@ -52,9 +52,20 @@ export function SalesLogView() {
     return () => clearTimeout(timer);
   }, [currentPage, pageSize, searchFilter, reconciledFilter, selectedSite, fetchSalesLog]);
 
+  const isException = (entry: SalesLogEntry) => {
+    return (
+      !entry.vin ||
+      entry.vin === 'TBA' ||
+      entry.vin.length < 10 ||
+      entry.amount < 1000 ||
+      (!entry.reconciled && (entry.deal_date.includes('Aug') || entry.deal_date.includes('2026-08')))
+    );
+  };
+
   const filteredSalesLog = salesLog.filter((entry) => {
     if (reconciledFilter === 'Reconciled' && !entry.reconciled) return false;
     if (reconciledFilter === 'Unreconciled' && entry.reconciled) return false;
+    if (reconciledFilter === 'Exceptions' && !isException(entry)) return false;
     if (searchFilter.trim()) {
       const q = searchFilter.toLowerCase();
       const matchCustomer = entry.customer_name.toLowerCase().includes(q);
@@ -203,6 +214,7 @@ export function SalesLogView() {
             <option value="All">All Statuses ({salesLog.length})</option>
             <option value="Reconciled">Reconciled with Finance</option>
             <option value="Unreconciled">Pending Reconciliation</option>
+            <option value="Exceptions">⚠️ Exception Queue (Discrepancies)</option>
           </select>
         </div>
 
@@ -232,46 +244,58 @@ export function SalesLogView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {filteredSalesLog.map((row) => (
-                <tr key={row.sales_log_id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                    {row.sales_log_id}
-                  </td>
-                  <td className="py-3.5 px-4 font-mono text-slate-600">{row.deal_date}</td>
-                  <td className="py-3.5 px-4 font-bold text-slate-900">{row.customer_name}</td>
-                  <td className="py-3.5 px-4 text-slate-800">{row.vehicle}</td>
-                  <td className="py-3.5 px-4 font-mono text-slate-600">{row.vin}</td>
-                  <td className="py-3.5 px-4 font-mono text-purple-700 font-bold">{row.stock_id}</td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-mono">
-                      {row.sale_type}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-slate-700">{row.consultant}</td>
-                  <td className="py-3.5 px-4 text-slate-600">{row.site}</td>
-                  <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                    ${row.amount.toLocaleString()}
-                  </td>
-                  <td className="py-3.5 px-4 font-mono text-emerald-600 font-bold">
-                    ${(row.gross || 0).toLocaleString()}
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    {row.reconciled ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Matched</span>
+              {filteredSalesLog.map((row) => {
+                const hasEx = isException(row);
+                return (
+                  <tr key={row.sales_log_id} className={`hover:bg-slate-50 transition-colors ${hasEx ? 'bg-amber-50/40' : ''}`}>
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                      <div className="flex items-center gap-1.5">
+                        {row.sales_log_id}
+                        {hasEx && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-200 text-amber-900" title="Missing VIN or aged unreconciled deal">
+                            FLAG
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-slate-600">{row.deal_date}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-900">{row.customer_name}</td>
+                    <td className="py-3.5 px-4 text-slate-800">{row.vehicle}</td>
+                    <td className="py-3.5 px-4 font-mono text-slate-600">
+                      {row.vin || <span className="text-amber-600 font-bold">Missing VIN</span>}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-purple-700 font-bold">{row.stock_id}</td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-mono">
+                        {row.sale_type}
                       </span>
-                    ) : (
-                      <button
-                        onClick={() => reconcileSalesLogRow(row.sales_log_id)}
-                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] uppercase font-mono tracking-wider"
-                      >
-                        Reconcile
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-700">{row.consultant}</td>
+                    <td className="py-3.5 px-4 text-slate-600">{row.site}</td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                      ${row.amount.toLocaleString()}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-emerald-600 font-bold">
+                      ${(row.gross || 0).toLocaleString()}
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      {row.reconciled ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Matched</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => reconcileSalesLogRow(row.sales_log_id)}
+                          className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors"
+                        >
+                          Reconcile
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

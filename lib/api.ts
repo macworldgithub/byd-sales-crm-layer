@@ -222,3 +222,23 @@ export const crmMessageApi = {
       body: JSON.stringify(payload),
     }),
 };
+
+// ─── Desk Session Authentication API ───────────────────────────────────────
+export const authApi = {
+  getDeskSession: async () => {
+    const res = await fetchApi<{ access_token: string; user: any }>('/auth/crm-session');
+    if (res.success && res.data?.access_token) {
+      setToken(res.data.access_token);
+    }
+    return res;
+  },
+};
+
+// ─── Dynamic Scoreboards & Targets API ───────────────────────────────────────
+export const boardApi = {
+  getBoardMe: () => fetchApi<any>('/crm/boards/me'),
+  getBoardTeam: () => fetchApi<any>('/crm/boards/team'),
+  getTargets: () => fetchApi<any>('/crm/targets'),
+  updateTarget: (payload: { period?: string; targetUnitCount: number; targetRevenue?: number }) =>
+    fetchApi<any>('/crm/targets', { method: 'POST', body: JSON.stringify(payload) }),
+};

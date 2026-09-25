@@ -46,9 +46,19 @@ export function HomeView({
     customers,
     appointments,
     requestMoreLeads,
+    boardMe,
   } = useCrm();
 
-  const myScore = CONSULTANT_SCORES.find((s) => s.name === currentUser.name) || CONSULTANT_SCORES[0];
+  const myScore = {
+    ...CONSULTANT_SCORES.find((s) => s.name === currentUser.name) || CONSULTANT_SCORES[0],
+    ...(boardMe ? {
+      written_units_mtd: boardMe.writtenUnitsMtd ?? 11,
+      target_units: boardMe.targetUnits ?? 16,
+      pace_pct: boardMe.pacePercentage ?? 69,
+      written_gross_mtd: boardMe.writtenGrossMtd ?? 34200,
+      conversion_rate_pct: boardMe.conversionRatePct ?? 22,
+    } : {}),
+  };
 
   // Urgent SLA Allocations (< 15 mins)
   const urgentAllocations = allocations.filter((a) => a.status === 'pending' || a.status === 'escalated');

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   BarChart3,
   Trophy,
@@ -14,28 +14,42 @@ import {
   CheckCircle2,
   Download,
   Filter,
+  Sliders,
+  X,
+  Send,
 } from 'lucide-react';
 import { useCrm } from '@/lib/crmContext';
 import { CONSULTANT_SCORES } from '@/lib/data';
 
 export function TeamScoreboardView() {
-  const { selectedSite, addToast } = useCrm();
-  const [siteFilter, setSiteFilter] = React.useState<string>('All');
+  const { selectedSite, addToast, boardTeam, updateConsultantTarget } = useCrm();
+  const [siteFilter, setSiteFilter] = useState<string>('All');
 
-  const filteredConsultants = CONSULTANT_SCORES.filter((c) => {
+  // Target Quota Modal State
+  const [isQuotaModalOpen, setIsQuotaModalOpen] = useState(false);
+  const [targetConsultant, setTargetConsultant] = useState('Alex Rivers');
+  const [targetUnitsInput, setTargetUnitsInput] = useState(16);
+  const [isSavingTarget, setIsSavingTarget] = useState(false);
+
+  // Merge live boardTeam consultants if available
+  const baseScores = (boardTeam && Array.isArray(boardTeam.consultants) && boardTeam.consultants.length > 0)
+    ? boardTeam.consultants
+    : CONSULTANT_SCORES;
+
+  const filteredConsultants = baseScores.filter((c: any) => {
     if (siteFilter !== 'All' && c.site !== siteFilter) return false;
     return true;
   });
 
-  const totalDepartmentUnits = filteredConsultants.reduce((s, c) => s + c.written_units_mtd, 0);
-  const totalDepartmentTarget = filteredConsultants.reduce((s, c) => s + c.target_units, 0);
-  const totalDepartmentGross = filteredConsultants.reduce((s, c) => s + c.written_gross_mtd, 0);
+  const totalDepartmentUnits = filteredConsultants.reduce((s: number, c: any) => s + (c.written_units_mtd || 0), 0);
+  const totalDepartmentTarget = filteredConsultants.reduce((s: number, c: any) => s + (c.target_units || 16), 0);
+  const totalDepartmentGross = filteredConsultants.reduce((s: number, c: any) => s + (c.written_gross_mtd || 0), 0);
 
   const handleExportCsv = () => {
     const headers = 'Consultant,Site,WrittenUnitsMTD,TargetUnits,PacePct,WrittenGrossMTD,ConversionRatePct,AvgFirstTouchMin,OpenDeals\n';
     const rows = filteredConsultants
       .map(
-        (c) =>
+        (c: any) =>
           `"${c.name}","${c.site}",${c.written_units_mtd},${c.target_units},${Math.round((c.written_units_mtd / (c.target_units || 1)) * 100)},${c.written_gross_mtd},${c.conversion_rate_pct},${c.avg_first_touch_minutes},${c.open_deals_count}`
       )
       .join('\n');
@@ -50,6 +64,17 @@ export function TeamScoreboardView() {
     document.body.removeChild(link);
 
     addToast('success', 'OEM Scoreboard Exported', 'CSV download initiated for Harmony Auto & BYD OEM management reviews.');
+  };
+
+  const handleSaveQuota = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingTarget(true);
+    try {
+      await updateConsultantTarget(targetConsultant, Number(targetUnitsInput));
+      setIsQuotaModalOpen(false);
+    } finally {
+      setIsSavingTarget(false);
+    }
   };
 
   return (
@@ -81,6 +106,14 @@ export function TeamScoreboardView() {
           </select>
 
           <button
+            onClick={() => setIsQuotaModalOpen(true)}
+            className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center gap-1.5 shadow-sm"
+          >
+            <Sliders className="w-3.5 h-3.5 text-slate-500" />
+            <span>Set Quota Targets</span>
+          </button>
+
+          <button
             onClick={handleExportCsv}
             className="signal-button flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md uppercase tracking-wider font-mono min-w-[120px]"
           >
@@ -98,34 +131,28 @@ export function TeamScoreboardView() {
           </span>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-bold text-slate-900 font-mono">{totalDepartmentUnits}</span>
-            <span className="text-slate-500 font-semibold">/ {totalDepartmentTarget} Target</span>
+            <span className="text-slate-400 font-semibold">/ {totalDepartmentTarget} Target</span>
           </div>
-          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
-            <div
-              className="bg-[#e60012] h-full rounded-full"
-              style={{ width: `${Math.round((totalDepartmentUnits / totalDepartmentTarget) * 100)}%` }}
-            />
-          </div>
-          <span className="text-[10px] text-slate-400 block pt-1">
-            {Math.round((totalDepartmentUnits / totalDepartmentTarget) * 100)}% of monthly target achieved
+          <span className="text-[11px] text-emerald-600 font-semibold block pt-1 font-mono">
+            {Math.round((totalDepartmentUnits / (totalDepartmentTarget || 1)) * 100)}% of Network Quota Run-Rate
           </span>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
-            Total Written Gross Revenue
+            Total Written Gross Profit (Est.)
           </span>
           <div className="text-3xl font-bold text-slate-900 font-mono">
             ${totalDepartmentGross.toLocaleString()}
           </div>
-          <span className="text-[11px] text-emerald-600 block pt-1 font-semibold">
-            Pacing +8.4% above previous month
+          <span className="text-[11px] text-slate-500 block pt-1">
+            Avg Profit: ${(totalDepartmentGross / (totalDepartmentUnits || 1)).toFixed(0)} / written contract
           </span>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
-            Network Conversion Funnel
+            Funnel Conversion Rate
           </span>
           <div className="text-3xl font-bold text-emerald-600 font-mono">38.4%</div>
           <span className="text-[11px] text-slate-500 block pt-1">
@@ -162,8 +189,8 @@ export function TeamScoreboardView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {filteredConsultants.sort((a, b) => b.written_units_mtd - a.written_units_mtd).map((rep, idx) => {
-                const pacePct = Math.round((rep.written_units_mtd / rep.target_units) * 100);
+              {filteredConsultants.sort((a: any, b: any) => (b.written_units_mtd || 0) - (a.written_units_mtd || 0)).map((rep: any, idx: number) => {
+                const pacePct = Math.round(((rep.written_units_mtd || 0) / (rep.target_units || 16)) * 100);
                 return (
                   <tr key={rep.name} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
@@ -180,8 +207,8 @@ export function TeamScoreboardView() {
                     </td>
                     <td className="py-3.5 px-4 text-slate-700">{rep.site}</td>
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                      {rep.written_units_mtd}{' '}
-                      <span className="text-slate-400 font-normal">/ {rep.target_units}</span>
+                      {rep.written_units_mtd || 0}{' '}
+                      <span className="text-slate-400 font-normal">/ {rep.target_units || 16}</span>
                     </td>
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
@@ -197,16 +224,16 @@ export function TeamScoreboardView() {
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                      ${rep.written_gross_mtd.toLocaleString()}
+                      ${(rep.written_gross_mtd || 0).toLocaleString()}
                     </td>
                     <td className="py-3.5 px-4 font-mono text-emerald-600 font-bold">
-                      {rep.conversion_rate_pct}%
+                      {rep.conversion_rate_pct || 25}%
                     </td>
                     <td className="py-3.5 px-4 font-mono text-slate-600">
-                      {rep.avg_first_touch_minutes} min
+                      {rep.avg_first_touch_minutes || 11} min
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono text-slate-900 font-bold">
-                      {rep.open_deals_count}
+                      {rep.open_deals_count || 4}
                     </td>
                   </tr>
                 );
@@ -215,6 +242,77 @@ export function TeamScoreboardView() {
           </table>
         </div>
       </div>
+
+      {/* Target Quota Modal */}
+      {isQuotaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-100 space-y-4 animate-in fade-in">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Manager Override</p>
+                <h3 className="text-lg font-bold text-slate-900 mt-0.5">Adjust Monthly Target Quota</h3>
+              </div>
+              <button
+                onClick={() => setIsQuotaModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuota} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Sales Consultant / Scope</label>
+                <select
+                  value={targetConsultant}
+                  onChange={(e) => setTargetConsultant(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none"
+                >
+                  <option value="Alex Rivers">Alex Rivers (Fairfield)</option>
+                  <option value="Sophie Tran">Sophie Tran (Melbourne City)</option>
+                  <option value="Jordan Vance">Jordan Vance (Doncaster)</option>
+                  <option value="Chloe Bennett">Chloe Bennett (Nunawading)</option>
+                  <option value="Site Target">Entire Department Target</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Target Units (Monthly)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={targetUnitsInput}
+                  onChange={(e) => setTargetUnitsInput(Number(e.target.value))}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold font-mono outline-none focus:border-slate-800"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsQuotaModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingTarget}
+                  className="signal-button px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+                >
+                  {isSavingTarget ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Target className="w-3.5 h-3.5" />
+                  )}
+                  <span>Persist Target Quota</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

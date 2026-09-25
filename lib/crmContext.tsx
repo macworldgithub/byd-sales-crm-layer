@@ -31,7 +31,7 @@ import {
   INITIAL_AUDIT_LOG,
   CONSULTANT_SCORES,
 } from './data';
-import { customerApi, opportunityApi, allocationApi, vyApi, syncApi, crmMessageApi } from './api';
+import { customerApi, opportunityApi, allocationApi, vyApi, syncApi, crmMessageApi, authApi, boardApi, getToken } from './api';
 
 export interface ToastMessage {
   id: string;
@@ -125,6 +125,11 @@ interface CrmContextType {
   // Actions: Appointments & Targets (§5.5, §5.9)
   createAppointment: (appt: Partial<Appointment>) => void;
   updateConsultantTarget: (consultantName: string, newTarget: number) => void;
+
+  // Scoreboards & Monthly Quotas
+  boardMe?: any;
+  boardTeam?: any;
+  fetchScoreboards: () => Promise<void>;
 
   // Actions: SMS Messaging (§5.9)
   sendSmsMessage: (customerId: string, phone: string, message: string) => Promise<boolean>;
@@ -291,15 +296,44 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const [boardMe, setBoardMe] = useState<any>(null);
+  const [boardTeam, setBoardTeam] = useState<any>(null);
+
+  const fetchScoreboards = useCallback(async () => {
+    try {
+      const [meRes, teamRes] = await Promise.allSettled([
+        boardApi.getBoardMe(),
+        boardApi.getBoardTeam(),
+      ]);
+      if (meRes.status === 'fulfilled' && meRes.value.success) {
+        setBoardMe(meRes.value.data);
+      }
+      if (teamRes.status === 'fulfilled' && teamRes.value.success) {
+        setBoardTeam(teamRes.value.data);
+      }
+    } catch (err) {
+      console.warn('fetchScoreboards error:', err);
+    }
+  }, []);
+
   // Live Backend Sync on Mount (§7.1, §7.3)
   useEffect(() => {
-    fetchCustomers({ page: 1, limit: 50 });
-    fetchOpportunities({ page: 1, limit: 50 });
-    fetchAllocations({ page: 1, limit: 50 });
-    fetchVyStock({ page: 1, limit: 20 });
-    fetchSalesLog({ page: 1, limit: 50 });
-    fetchDeliveryWatch({ page: 1, limit: 20 });
-  }, [fetchCustomers, fetchOpportunities, fetchAllocations, fetchVyStock, fetchSalesLog, fetchDeliveryWatch]);
+    const initSession = async () => {
+      if (!getToken()) {
+        try {
+          await authApi.getDeskSession();
+        } catch {}
+      }
+      fetchCustomers({ page: 1, limit: 50 });
+      fetchOpportunities({ page: 1, limit: 50 });
+      fetchAllocations({ page: 1, limit: 50 });
+      fetchVyStock({ page: 1, limit: 20 });
+      fetchSalesLog({ page: 1, limit: 50 });
+      fetchDeliveryWatch({ page: 1, limit: 20 });
+      fetchScoreboards();
+    };
+    initSession();
+  }, [fetchCustomers, fetchOpportunities, fetchAllocations, fetchVyStock, fetchSalesLog, fetchDeliveryWatch, fetchScoreboards]);
 
   // Add Customer with Live Database Duplicate Detection (§5.1 & AC-1)
   const addCustomer = async (data: Partial<Customer>): Promise<Customer> => {
@@ -969,12 +1003,18 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   };
 
   // Target Quota Maintenance (§5.5)
-  const updateConsultantTarget = (consultantName: string, newTarget: number) => {
+  const updateConsultantTarget = async (consultantName: string, newTarget: number) => {
     const score = CONSULTANT_SCORES.find((s) => s.name === consultantName);
     if (score) {
       score.target_units = newTarget;
     }
-    addToast('success', 'Monthly Quota Updated', `Updated target for ${consultantName} to ${newTarget} units.`);
+    try {
+      await boardApi.updateTarget({ targetUnitCount: newTarget });
+      await fetchScoreboards();
+      addToast('success', 'Monthly Quota Updated', `Updated target for ${consultantName} to ${newTarget} units.`);
+    } catch {
+      addToast('info', 'Monthly Quota Saved Locally', `Updated target for ${consultantName} to ${newTarget} units.`);
+    }
   };
 
   // Virtual Yard Stock Hold (§5.6 & AC-8)
@@ -1159,6 +1199,8 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
+
+
   // Filtered lists based on tenancy (selectedSite)
   const filteredCustomers =
     selectedSite === 'All Sites'
@@ -1204,6 +1246,11 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         deliveryWatch,
         appointments: filteredAppointments,
         auditLog,
+
+        // Scoreboards & Quotas
+        boardMe,
+        boardTeam,
+        fetchScoreboards,
 
         // Pagination states & fetchers
         vyStockPagination,

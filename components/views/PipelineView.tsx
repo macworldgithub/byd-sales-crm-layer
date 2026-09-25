@@ -40,6 +40,7 @@ export function PipelineView({
   const [searchFilter, setSearchFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('All');
   const [consultantFilter, setConsultantFilter] = useState('All');
+  const [accountTypeFilter, setAccountTypeFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
 
@@ -79,6 +80,11 @@ export function PipelineView({
     if (stageFilter !== 'All' && opp.stage !== stageFilter) return false;
     if (modelFilter !== 'All' && opp.model !== modelFilter) return false;
     if (consultantFilter !== 'All' && opp.owner_name !== consultantFilter) return false;
+    if (accountTypeFilter !== 'All') {
+      if (accountTypeFilter === 'Fleet' && !opp.sale_type.toLowerCase().includes('fleet') && !opp.sale_type.toLowerCase().includes('abn')) return false;
+      if (accountTypeFilter === 'Retail' && opp.sale_type.toLowerCase().includes('fleet')) return false;
+      if (accountTypeFilter === 'Household' && !opp.customer_name.includes('&') && !opp.vehicle_descriptor.toLowerCase().includes('household')) return false;
+    }
     if (searchFilter.trim()) {
       const q = searchFilter.toLowerCase();
       const matchName = opp.customer_name.toLowerCase().includes(q);
@@ -214,6 +220,17 @@ export function PipelineView({
                 {c}
               </option>
             ))}
+          </select>
+
+          <select
+            value={accountTypeFilter}
+            onChange={(e) => setAccountTypeFilter(e.target.value)}
+            className="w-full lg:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+          >
+            <option value="All">All Account Types</option>
+            <option value="Retail">Retail (Private)</option>
+            <option value="Fleet">Fleet / Commercial (ABN)</option>
+            <option value="Household">Household Group</option>
           </select>
         </div>
 
