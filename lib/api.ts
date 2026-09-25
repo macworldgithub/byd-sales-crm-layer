@@ -119,6 +119,11 @@ export const customerApi = {
       method: 'POST',
       body: JSON.stringify({ sourceId }),
     }),
+  unlinkCustomer: (id: string, linkType: 'lead' | 'delivery' | 'all' = 'delivery') =>
+    fetchApi<Customer>(`/crm/customers/${id}/unlink`, {
+      method: 'POST',
+      body: JSON.stringify({ linkType }),
+    }),
   getTimeline: (customerId: string, params?: Record<string, string | number | boolean | undefined>) =>
     fetchApi<TimelineEvent[]>(`/crm/customers/${customerId}/timeline${buildQueryString(params)}`),
   addTimelineNote: (customerId: string, note: { author: string; content: string }) =>
@@ -211,6 +216,13 @@ export const syncApi = {
     fetchApi(`/clients/${clientId}/comments`, {
       method: 'POST',
       body: JSON.stringify({ body: note }),
+    }),
+  requestDeliveryDateChange: (clientId: string, requestedDate: string, reason: string) =>
+    fetchApi<{ success: boolean; message?: string }>(`/clients/${clientId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({
+        body: `[DELIVERY DATE CHANGE REQUEST] Requested Date: ${requestedDate} | Reason: ${reason} | Action Required by Delivery Coordinator`,
+      }),
     }),
 };
 

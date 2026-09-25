@@ -25,6 +25,7 @@ import {
   Layers,
   ChevronRight,
   Plus,
+  Unlink,
 } from 'lucide-react';
 import { Customer, Opportunity, TimelineEvent, DeliveryHandoverWatch } from '@/lib/types';
 import { useCrm } from '@/lib/crmContext';
@@ -52,6 +53,7 @@ export function Customer360Modal({
     addTimelineNote,
     fetchCustomerTimeline,
     toggleOptOut,
+    unlinkCustomer,
     sendSmsMessage,
     logPhoneCall,
   } = useCrm();
@@ -219,6 +221,20 @@ export function Customer360Modal({
               >
                 <ShieldAlert className="w-3.5 h-3.5" />
                 <span>{customer.do_not_contact ? 'DNC' : 'Consented'}</span>
+              </button>
+
+              {/* Unlink Mismatched Record (§5.10) */}
+              <button
+                onClick={() => {
+                  if (confirm(`Unlink record association for ${customer.name}? This will separate any mismatched Lead Centre or Delivery Centre links.`)) {
+                    unlinkCustomer(customer.customer_id, 'delivery');
+                  }
+                }}
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                title="Unlink mismatched Lead or Delivery link"
+              >
+                <Unlink className="w-3.5 h-3.5 text-amber-600" />
+                <span className="hidden sm:inline">Unlink</span>
               </button>
 
               <button
@@ -828,6 +844,24 @@ export function Customer360Modal({
 
                     <div className="text-xs text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
                       <strong>Last Delivery Comment:</strong> {customerDelivery.last_comment}
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                      <span className="text-[11px] text-slate-400">
+                        Linked Delivery ID: {customerDelivery.client_id}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Uncouple Delivery record ${customerDelivery.client_id} from ${customer.name}?`)) {
+                            unlinkCustomer(customer.customer_id, 'delivery');
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                      >
+                        <Unlink className="w-3.5 h-3.5" />
+                        <span>Unlink Delivery Record</span>
+                      </button>
                     </div>
                   </div>
                 </div>

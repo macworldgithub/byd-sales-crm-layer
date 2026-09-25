@@ -81,6 +81,7 @@ interface CrmContextType {
   addCustomer: (data: Partial<Customer>) => Promise<Customer>;
   updateCustomer: (customerId: string, patch: Partial<Customer>) => void;
   mergeCustomers: (sourceId: string, targetId: string) => void;
+  unlinkCustomer: (customerId: string, linkType?: 'lead' | 'delivery' | 'all') => Promise<void>;
   toggleOptOut: (customerId: string) => void;
   addTimelineNote: (customerId: string, content: string, opportunityId?: string) => void;
   fetchCustomerTimeline: (customerId: string) => Promise<void>;
@@ -121,6 +122,7 @@ interface CrmContextType {
 
   // Actions: Delivery Handover (§5.8)
   addDeliveryHandoverNote: (clientId: string, note: string) => void;
+  requestDeliveryDateChange: (clientId: string, requestedDate: string, reason: string) => Promise<void>;
 
   // Actions: Appointments & Targets (§5.5, §5.9)
   createAppointment: (appt: Partial<Appointment>) => void;
@@ -470,6 +472,50 @@ export function CrmProvider({ children }: { children: ReactNode }) {
       'success',
       'Duplicate Merged Successfully',
       `All deals and history from ${source.name} unified into record ${target.name}.`
+    );
+  };
+
+  // Unlink Customer Record (§5.10 & Gap Remediation)
+  const unlinkCustomer = async (customerId: string, linkType: 'lead' | 'delivery' | 'all' = 'delivery') => {
+    try {
+      await customerApi.unlinkCustomer(customerId, linkType);
+    } catch (err) {
+      console.warn('unlinkCustomer api error:', err);
+    }
+
+    const targetCust = customers.find((c) => c.customer_id === customerId);
+    const custName = targetCust ? targetCust.name : customerId;
+
+    // Record Audit & Timeline
+    const audit: AuditLogEntry = {
+      audit_id: `AUD-${Date.now().toString().slice(-4)}`,
+      actor: currentUser.name,
+      action: 'Customer Record Unlinked',
+      target_type: 'Customer',
+      target_id: customerId,
+      details: `Unlinked mismatched ${linkType} record association for customer ${custName}.`,
+      source: 'Sales CRM',
+      timestamp: new Date().toISOString(),
+    };
+    setAuditLog((prev) => [audit, ...prev]);
+
+    const timelineEvt: TimelineEvent = {
+      event_id: `EVT-${Date.now().toString().slice(-4)}`,
+      customer_id: customerId,
+      occurred_at: 'Just now (AEST)',
+      source: 'Sales CRM',
+      type: 'system',
+      author: currentUser.name,
+      title: `Association Unlinked (${linkType.toUpperCase()})`,
+      content: `Disassociated mismatched ${linkType} record from customer profile by ${currentUser.name}.`,
+      visibility: 'internal',
+    };
+    setTimelineEvents((prev) => [timelineEvt, ...prev]);
+
+    addToast(
+      'success',
+      'Record Unlinked',
+      `Successfully detached ${linkType} record association for ${custName}.`
     );
   };
 
@@ -1138,6 +1184,45 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     addToast('success', 'Handover Note Sent', 'Note transmitted to Delivery Centre specialist.');
   };
 
+  // Request Delivery Date Change Action (§5.8)
+  const requestDeliveryDateChange = async (clientId: string, requestedDate: string, reason: string) => {
+    try {
+      await syncApi.requestDeliveryDateChange(clientId, requestedDate, reason);
+    } catch (err) {
+      console.warn('requestDeliveryDateChange api error:', err);
+    }
+
+    setDeliveryWatch((prev) =>
+      prev.map((d) =>
+        d.client_id === clientId
+          ? {
+              ...d,
+              last_comment: `[DATE CHANGE REQUEST]: Move to ${requestedDate} (${reason})`,
+              alert: 'Date Change Requested',
+            }
+          : d
+      )
+    );
+
+    const client = deliveryWatch.find((d) => d.client_id === clientId);
+    if (client) {
+      const opp = opportunities.find((o) => o.opportunity_id === client.opportunity_id);
+      if (opp) {
+        addTimelineNote(
+          opp.customer_id,
+          `[DELIVERY DATE CHANGE REQUEST]: Requested Date: ${requestedDate} | Reason: ${reason}`,
+          opp.opportunity_id
+        );
+      }
+    }
+
+    addToast(
+      'info',
+      'Date Change Transmitted',
+      `Requested reschedule to ${requestedDate} sent to Delivery Centre Coordinator.`
+    );
+  };
+
   // Appointment creation
   const createAppointment = (appt: Partial<Appointment>) => {
     const newAppt: Appointment = {
@@ -1269,6 +1354,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         addCustomer,
         updateCustomer,
         mergeCustomers,
+        unlinkCustomer,
         toggleOptOut,
         addTimelineNote,
         fetchCustomerTimeline,
@@ -1284,6 +1370,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         releaseStock,
         reconcileSalesLogRow,
         addDeliveryHandoverNote,
+        requestDeliveryDateChange,
         createAppointment,
         updateConsultantTarget,
         sendSmsMessage,
