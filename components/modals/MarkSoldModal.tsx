@@ -97,22 +97,22 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[92vh]">
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-100 text-[#e60012] flex items-center justify-center font-bold">
+        <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-start justify-between">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-red-100 text-[#e60012] flex items-center justify-center font-bold shrink-0">
               <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
               <span className="text-[10px] font-bold text-[#e60012] tracking-wider uppercase font-mono">
                 Controlled Orchestration · §7.5
               </span>
-              <h3 className="text-lg font-bold text-slate-900">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">
                 Mark Deal Written & Sold
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-1">
                 {opportunity.vehicle_descriptor} · {opportunity.customer_name} (${opportunity.total_deal_value.toLocaleString()})
               </p>
             </div>
@@ -126,34 +126,40 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
         </div>
 
         {/* 3-Way Synchronization Diagram Banner */}
-        <div className="p-4 bg-slate-900 text-white border-b border-slate-800">
+        <div className="p-3 sm:p-4 bg-slate-900 text-white border-b border-slate-800">
           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono mb-2">
             Atomic Multi-System Write Architecture
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="p-2.5 rounded-xl bg-white/10 border border-white/10 flex flex-col items-center gap-1">
-              <Car className="w-4 h-4 text-sky-400" />
-              <strong className="text-[11px]">1. Virtual Yard</strong>
-              <span className="text-[9px] text-slate-300">Reserve & confirm order</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-white/10 border border-white/10 flex sm:flex-col items-center gap-2 sm:gap-1 text-left sm:text-center">
+              <Car className="w-4 h-4 text-sky-400 shrink-0" />
+              <div>
+                <strong className="text-[11px] block">1. Virtual Yard</strong>
+                <span className="text-[9px] text-slate-300 block">Reserve & confirm order</span>
+              </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-white/10 border border-white/10 flex flex-col items-center gap-1">
-              <FileCheck2 className="w-4 h-4 text-emerald-400" />
-              <strong className="text-[11px]">2. Sales Log</strong>
-              <span className="text-[9px] text-slate-300">Live written deal upsert</span>
+            <div className="p-2 sm:p-2.5 rounded-xl bg-white/10 border border-white/10 flex sm:flex-col items-center gap-2 sm:gap-1 text-left sm:text-center">
+              <FileCheck2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div>
+                <strong className="text-[11px] block">2. Sales Log</strong>
+                <span className="text-[9px] text-slate-300 block">Live written deal upsert</span>
+              </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-white/10 border border-white/10 flex flex-col items-center gap-1">
-              <Truck className="w-4 h-4 text-amber-400" />
-              <strong className="text-[11px]">3. Delivery Centre</strong>
-              <span className="text-[9px] text-slate-300">Create handover client</span>
+            <div className="p-2 sm:p-2.5 rounded-xl bg-white/10 border border-white/10 flex sm:flex-col items-center gap-2 sm:gap-1 text-left sm:text-center">
+              <Truck className="w-4 h-4 text-amber-400 shrink-0" />
+              <div>
+                <strong className="text-[11px] block">3. Delivery Centre</strong>
+                <span className="text-[9px] text-slate-300 block">Create handover client</span>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 flex-1">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5 flex-1">
           {/* Stock & VIN Selection */}
           <div className="space-y-3">
-            <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center justify-between font-mono">
+            <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-mono">
               <span>Vehicle Identification & Stock Unit *</span>
               <span className="text-[10px] text-slate-500 font-normal">Mandatory for Delivery & Sales Log</span>
             </label>
@@ -199,7 +205,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
           </div>
 
           {/* Sale Type & Finance Method */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
                 Sale Type (Delivery Centre Enum) *
@@ -296,18 +302,18 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
           </div>
 
           {/* Buttons */}
-          <div className="pt-2 flex items-center justify-end gap-3">
+          <div className="pt-2 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs text-center"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs shadow-lg shadow-red-600/30 flex items-center gap-2 uppercase tracking-wider font-mono disabled:opacity-50"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 uppercase tracking-wider font-mono disabled:opacity-50 text-center"
             >
               <Sparkles className="w-4 h-4" />
               <span>{isSubmitting ? 'Orchestrating Deal...' : 'Execute Mark Sold'}</span>

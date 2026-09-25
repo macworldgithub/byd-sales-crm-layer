@@ -76,10 +76,10 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
             onClick={requestMoreLeads}
-            className="signal-button px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md uppercase tracking-wider font-mono"
+            className="signal-button w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md uppercase tracking-wider font-mono"
           >
             <Sparkles className="w-4 h-4" />
             <span>Request More Leads</span>
@@ -90,25 +90,25 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
       {/* AC-11 Quarantine & Production Guard Banner */}
       <div className="p-3.5 rounded-xl bg-slate-900 text-white flex items-center justify-between text-xs shadow-sm flex-wrap gap-2">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0">
             <ShieldCheck className="w-4 h-4" />
           </div>
           <div>
-            <span className="font-bold text-white flex items-center gap-1.5">
+            <span className="font-bold text-white flex items-center gap-1.5 flex-wrap">
               Production Mode Active · Lead Centre Sandbox Quarantined (§5.10 & AC-11)
             </span>
-            <span className="text-[11px] text-slate-300">
+            <span className="text-[11px] text-slate-300 block sm:inline">
               Demo-dataset records (~4,036 attachment prospects) are isolated from production CRM. Only live verified customer records are allocated to sales floor desks.
             </span>
           </div>
         </div>
-        <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30">
+        <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30 shrink-0">
           Zero Bleed Guard
         </span>
       </div>
 
       {/* SLA Status Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-xs">
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
@@ -170,7 +170,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
           {allocations.map((alloc) => (
             <div
               key={alloc.allocation_id}
-              className={`p-5 rounded-2xl border transition-all space-y-3 ${
+              className={`p-4 sm:p-5 rounded-2xl border transition-all space-y-3 ${
                 alloc.status === 'escalated'
                   ? 'border-red-300 bg-red-50/30'
                   : alloc.status === 'accepted'
@@ -194,17 +194,17 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-600">
+                  <div className="flex items-center gap-2 sm:gap-3 mt-1.5 text-xs text-slate-600 flex-wrap">
                     <span className="font-mono font-medium">{alloc.phone}</span>
                     <span>·</span>
-                    <span>{alloc.email}</span>
+                    <span className="truncate max-w-[200px]">{alloc.email}</span>
                     <span>·</span>
                     <span className="font-semibold text-slate-800">{alloc.vehicle}</span>
                   </div>
                 </div>
 
                 {/* SLA Clock Badge (§5.3 & AC-4) */}
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <div
                     className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold font-mono ${
                       alloc.status === 'escalated'
@@ -246,29 +246,29 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-1 flex-wrap gap-2 text-xs">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-1 gap-2.5 text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-slate-500">Current Owner:</span>
                   <strong className="text-slate-900">{alloc.assigned_to}</strong>
                   <a
                     href={`https://byd-leads-crm.vercel.app/leads/${alloc.lead_prospect_id}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[#e60012] hover:underline flex items-center gap-1 font-semibold ml-2"
+                    className="text-[#e60012] hover:underline flex items-center gap-1 font-semibold ml-1 sm:ml-2"
                   >
-                    <span>Lead Centre Prospect</span>
+                    <span>Lead Centre</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                   {alloc.status !== 'accepted' && (
                     <button
                       onClick={() => acceptAllocation(alloc.allocation_id)}
-                      className="px-4 py-2 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-red-600/20 font-mono uppercase tracking-wider"
+                      className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-red-600/20 font-mono uppercase tracking-wider min-w-[140px]"
                     >
                       <UserCheck className="w-4 h-4" />
-                      <span>Accept SLA & Own Deal</span>
+                      <span>Accept SLA</span>
                     </button>
                   )}
 
@@ -277,7 +277,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                       setReassignModalAlloc(alloc);
                       setTargetConsultant(consultants[0]?.name || '');
                     }}
-                    className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs"
+                    className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs text-center"
                   >
                     Reassign
                   </button>
@@ -287,7 +287,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                       const cust = customers.find((c) => c.customer_id === alloc.customer_id);
                       if (cust) onSelectCustomer(cust);
                     }}
-                    className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs"
+                    className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs text-center"
                   >
                     Customer 360
                   </button>

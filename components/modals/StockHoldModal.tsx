@@ -25,19 +25,19 @@ export function StockHoldModal({ isOpen, onClose, stock }: StockHoldModalProps) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[92vh]">
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+        <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
               <Car className="w-5 h-5" />
             </div>
             <div>
               <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider font-mono">
                 Virtual Yard · §5.6
               </span>
-              <h3 className="text-lg font-bold text-slate-900">Place Stock Hold</h3>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">Place Stock Hold</h3>
             </div>
           </div>
           <button
@@ -49,7 +49,7 @@ export function StockHoldModal({ isOpen, onClose, stock }: StockHoldModalProps) 
         </div>
 
         {/* Stock Details */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
             <div className="flex items-center justify-between font-bold text-slate-900">
               <span>{stock.model} {stock.variant}</span>
@@ -91,17 +91,17 @@ export function StockHoldModal({ isOpen, onClose, stock }: StockHoldModalProps) 
             </div>
           </div>
 
-          <div className="pt-2 flex items-center justify-end gap-3">
+          <div className="pt-2 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs text-center"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs shadow-md font-mono uppercase tracking-wider"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs shadow-md font-mono uppercase tracking-wider text-center"
             >
               Confirm 48h Hold
             </button>

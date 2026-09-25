@@ -54,7 +54,7 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
 
         <button
           onClick={onOpenBookDrive}
-          className="signal-button px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md uppercase tracking-wider font-mono"
+          className="signal-button w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md uppercase tracking-wider font-mono"
         >
           <Plus className="w-4 h-4" />
           <span>Book Test Drive</span>
@@ -62,9 +62,9 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
       </div>
 
       {/* Filter Row */}
-      <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 flex-1 min-w-[280px]">
-          <div className="relative flex-1 max-w-sm">
+      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 w-full">
+          <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
@@ -78,7 +78,7 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            className="w-full sm:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
           >
             <option value="All">All Statuses ({appointments.length})</option>
             <option value="Confirmed">Confirmed</option>
@@ -88,13 +88,13 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
           </select>
         </div>
 
-        <span className="text-xs font-mono text-slate-400">
+        <span className="text-xs font-mono text-slate-400 shrink-0 text-right sm:text-left pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
           {filteredAppointments.length} appointments booked
         </span>
       </div>
 
       {/* Appointments List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
         {filteredAppointments.map((appt) => (
           <div
             key={appt.appointment_id}

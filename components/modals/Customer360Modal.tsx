@@ -140,13 +140,13 @@ export function Customer360Modal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden flex flex-col h-[94vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden flex flex-col h-[96dvh] sm:h-[94vh] max-h-[96dvh]">
         {/* Hero Customer 360 Header (§5.1 & AC-1) */}
-        <div className="p-5 border-b border-slate-200 bg-slate-50 flex flex-col gap-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#171b22] text-white flex items-center justify-center font-bold text-base font-mono shadow-md">
+        <div className="p-3.5 sm:p-5 border-b border-slate-200 bg-slate-50 flex flex-col gap-3 sm:gap-4 shrink-0">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
+            <div className="flex items-start gap-3 sm:gap-4 min-w-0 w-full sm:w-auto">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#171b22] text-white flex items-center justify-center font-bold text-sm sm:text-base font-mono shadow-md shrink-0">
                 {customer.name
                   .split(' ')
                   .map((n) => n[0])
@@ -155,9 +155,9 @@ export function Customer360Modal({
                   .toUpperCase()}
               </div>
 
-              <div>
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
                     {customer.name}
                   </h2>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-mono">
@@ -167,27 +167,27 @@ export function Customer360Modal({
                     {customer.current_stage || activeOpp?.stage || 'Qualified'}
                   </span>
                   {customer.company_name && (
-                    <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                    <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded truncate">
                       {customer.company_name}
                     </span>
                   )}
                 </div>
 
                 {/* Contact Coordinates */}
-                <div className="flex items-center gap-4 mt-1.5 text-xs text-slate-600 flex-wrap">
+                <div className="flex items-center gap-2 sm:gap-4 mt-1.5 text-xs text-slate-600 flex-wrap">
                   <span className="flex items-center gap-1 font-mono font-medium text-slate-800">
                     <Phone className="w-3.5 h-3.5 text-[#e60012]" />
                     {customer.phone}
                   </span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1 truncate max-w-[180px]">
                     <Mail className="w-3.5 h-3.5 text-slate-400" />
                     {customer.email}
                   </span>
                   <span className="flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    {customer.site} Showroom
+                    {customer.site}
                   </span>
-                  <span className="text-slate-400">·</span>
+                  <span className="hidden sm:inline text-slate-400">·</span>
                   <span className="text-slate-500">
                     Owner: <strong className="text-slate-800">{customer.owner_name}</strong>
                   </span>
@@ -196,21 +196,21 @@ export function Customer360Modal({
             </div>
 
             {/* Quick Actions & Deep Links */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
               {/* Click-to-call Logger Button (§5.9) */}
               <button
                 onClick={() => setIsCallLoggerOpen(true)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
                 title="Log phone outreach call"
               >
                 <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Log Call</span>
+                <span className="hidden xs:inline">Log Call</span>
               </button>
 
               {/* ACMA Opt-out Button */}
               <button
                 onClick={() => toggleOptOut(customer.customer_id)}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
                   customer.do_not_contact
                     ? 'bg-red-500 text-white border-red-600 hover:bg-red-600'
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
@@ -218,7 +218,7 @@ export function Customer360Modal({
                 title="Toggle ACMA compliant do-not-contact flag"
               >
                 <ShieldAlert className="w-3.5 h-3.5" />
-                <span>{customer.do_not_contact ? 'DNC Opted Out' : 'Active Consent'}</span>
+                <span>{customer.do_not_contact ? 'DNC' : 'Consented'}</span>
               </button>
 
               <button
@@ -236,7 +236,7 @@ export function Customer360Modal({
               <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
                 Open Deal Value
               </span>
-              <strong className="text-sm font-bold text-slate-900">
+              <strong className="text-sm font-bold text-slate-900 font-mono">
                 ${(customer.total_open_value || activeOpp?.total_deal_value || 0).toLocaleString()}
               </strong>
             </div>
@@ -260,8 +260,8 @@ export function Customer360Modal({
                 rel="noreferrer"
                 className="text-xs font-semibold text-sky-600 hover:underline flex items-center gap-1"
               >
-                <span>Lead #{customer.lead_prospect_id || 'LP-40192'}</span>
-                <ExternalLink className="w-3 h-3" />
+                <span className="truncate">Lead #{customer.lead_prospect_id || 'LP-40192'}</span>
+                <ExternalLink className="w-3 h-3 shrink-0" />
               </a>
             </div>
 
@@ -276,25 +276,25 @@ export function Customer360Modal({
                   rel="noreferrer"
                   className="text-xs font-semibold text-emerald-600 hover:underline flex items-center gap-1"
                 >
-                  <span>{customerDelivery.stage}</span>
-                  <ExternalLink className="w-3 h-3" />
+                  <span className="truncate">{customerDelivery.stage}</span>
+                  <ExternalLink className="w-3 h-3 shrink-0" />
                 </a>
               ) : (
-                <span className="text-xs text-slate-400 italic">Pre-sale (Not in Delivery)</span>
+                <span className="text-xs text-slate-400 italic">Pre-sale (Floor)</span>
               )}
             </div>
           </div>
         </div>
 
         {/* 9 Tab Navigation */}
-        <div className="flex items-center gap-1 px-4 border-b border-slate-200 bg-white overflow-x-auto shrink-0">
+        <div className="flex items-center gap-1 px-3 sm:px-4 border-b border-slate-200 bg-white overflow-x-auto touch-scroll shrink-0">
           {tabs.map((t) => {
             const isActive = activeTab === t.id;
             return (
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id as any)}
-                className={`py-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-colors ${
+                className={`py-2.5 sm:py-3 px-2.5 sm:px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-colors ${
                   isActive
                     ? 'border-[#e60012] text-[#e60012]'
                     : 'border-transparent text-slate-600 hover:text-slate-900'
@@ -319,7 +319,7 @@ export function Customer360Modal({
         </div>
 
         {/* Tab Content Body */}
-        <div className="p-6 overflow-y-auto flex-1 bg-slate-50/50">
+        <div className="p-3.5 sm:p-6 overflow-y-auto flex-1 bg-slate-50/50 touch-scroll">
           {/* 1. TIMELINE TAB (§5.2 & AC-2, AC-3) */}
           {activeTab === 'timeline' && (
             <div className="space-y-6 max-w-3xl mx-auto">

@@ -67,11 +67,11 @@ export function TeamScoreboardView() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <select
             value={siteFilter}
             onChange={(e) => setSiteFilter(e.target.value)}
-            className="text-xs p-2.5 rounded-xl border border-slate-200 bg-white font-medium outline-none shadow-sm"
+            className="flex-1 sm:flex-initial text-xs p-2.5 rounded-xl border border-slate-200 bg-white font-medium outline-none shadow-sm min-w-[140px]"
           >
             <option value="All">All Showroom Sites</option>
             <option value="Fairfield">Fairfield</option>
@@ -82,7 +82,7 @@ export function TeamScoreboardView() {
 
           <button
             onClick={handleExportCsv}
-            className="signal-button px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md uppercase tracking-wider font-mono"
+            className="signal-button flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md uppercase tracking-wider font-mono min-w-[120px]"
           >
             <Download className="w-4 h-4" />
             <span>Export CSV</span>
@@ -146,7 +146,7 @@ export function TeamScoreboardView() {
           <span className="text-xs font-mono text-slate-400">Current Month Pacing</span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto touch-scroll">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-500 font-mono uppercase text-[10px] border-b border-slate-200 tracking-wider">
               <tr>

@@ -126,12 +126,12 @@ export function PipelineView({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           {/* Board / List Switcher */}
-          <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm flex-1 sm:flex-initial justify-center">
             <button
               onClick={() => setViewMode('board')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                 viewMode === 'board'
                   ? 'bg-slate-900 text-white shadow'
                   : 'text-slate-600 hover:text-slate-900'
@@ -142,7 +142,7 @@ export function PipelineView({
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                 viewMode === 'list'
                   ? 'bg-slate-900 text-white shadow'
                   : 'text-slate-600 hover:text-slate-900'
@@ -155,7 +155,7 @@ export function PipelineView({
 
           <button
             onClick={onOpenQuickDeal}
-            className="signal-button px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md uppercase tracking-wider font-mono"
+            className="signal-button flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md uppercase tracking-wider font-mono min-w-[130px]"
           >
             <Plus className="w-4 h-4" />
             <span>Register Deal</span>
@@ -164,9 +164,9 @@ export function PipelineView({
       </div>
 
       {/* Filter Bar Row */}
-      <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 flex-1 min-w-[280px]">
-          <div className="relative flex-1 max-w-sm">
+      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex items-center gap-2.5 w-full lg:flex-1">
+          <div className="relative w-full sm:col-span-2 lg:col-span-1 lg:max-w-xs">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
@@ -180,7 +180,7 @@ export function PipelineView({
           <select
             value={modelFilter}
             onChange={(e) => setModelFilter(e.target.value)}
-            className="text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            className="w-full lg:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
           >
             <option value="All">All BYD Models</option>
             <option value="SEALION 7">SEALION 7</option>
@@ -193,7 +193,7 @@ export function PipelineView({
           <select
             value={stageFilter}
             onChange={(e) => setStageFilter(e.target.value)}
-            className="text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            className="w-full lg:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
           >
             <option value="All">All Stages ({opportunities.length})</option>
             {STAGES.map((s) => (
@@ -206,7 +206,7 @@ export function PipelineView({
           <select
             value={consultantFilter}
             onChange={(e) => setConsultantFilter(e.target.value)}
-            className="text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            className="w-full lg:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
           >
             <option value="All">All Consultants ({allConsultants.length})</option>
             {allConsultants.map((c) => (
@@ -217,16 +217,18 @@ export function PipelineView({
           </select>
         </div>
 
-        <div className="text-xs font-mono text-slate-500">
-          Total Value:{' '}
-          <strong className="text-slate-900 font-bold">${totalPipelineValue.toLocaleString()}</strong> ({filteredDeals.length} active deals)
+        <div className="text-xs font-mono text-slate-500 pt-1 lg:pt-0 border-t lg:border-t-0 border-slate-100 flex items-center justify-between lg:justify-end gap-2">
+          <span>Total Pipeline Value:</span>
+          <span>
+            <strong className="text-slate-900 font-bold">${totalPipelineValue.toLocaleString()}</strong> ({filteredDeals.length} active)
+          </span>
         </div>
       </div>
 
       {/* KANBAN BOARD VIEW */}
       {viewMode === 'board' ? (
-        <div className="overflow-x-auto pb-4">
-          <div className="flex gap-4 min-w-max">
+        <div className="overflow-x-auto pb-4 -mx-1 px-1 touch-scroll overscroll-x-contain">
+          <div className="flex gap-3 sm:gap-4 min-w-max">
             {STAGES.map((colStage) => {
               const stageDeals = filteredDeals.filter((d) => d.stage === colStage);
               const colValue = stageDeals.reduce((sum, d) => sum + d.total_deal_value, 0);

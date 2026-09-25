@@ -78,19 +78,19 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[92vh]">
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-100 text-[#e60012] flex items-center justify-center font-bold">
+        <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-red-100 text-[#e60012] flex items-center justify-center font-bold shrink-0">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <span className="text-[10px] font-bold text-[#e60012] uppercase tracking-wider font-mono">
                 Pipeline Deal Registration
               </span>
-              <h3 className="text-lg font-bold text-slate-900">Register New Opportunity</h3>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">Register New Opportunity</h3>
             </div>
           </div>
           <button
@@ -102,7 +102,7 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
           {/* Customer Selection */}
           <div>
             <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
@@ -220,7 +220,7 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
           </div>
 
           {/* Pricing Row */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
                 List Price ($)
@@ -269,37 +269,37 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
             </label>
 
             {tradeInFlag && (
-              <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 <input
                   type="text"
                   placeholder="Make & Model (e.g. 2019 Mazda CX-5)"
                   value={tradeInMake}
                   onChange={(e) => setTradeInMake(e.target.value)}
-                  className="text-xs p-2 rounded-lg border border-slate-200 bg-white"
+                  className="text-xs p-2.5 rounded-lg border border-slate-200 bg-white"
                 />
                 <input
                   type="number"
                   placeholder="Estimated Valuation ($)"
                   value={tradeInValuation}
                   onChange={(e) => setTradeInValuation(e.target.value)}
-                  className="text-xs p-2 rounded-lg border border-slate-200 bg-white"
+                  className="text-xs p-2.5 rounded-lg border border-slate-200 bg-white"
                 />
               </div>
             )}
           </div>
 
           {/* Submit Action */}
-          <div className="pt-2 flex items-center justify-end gap-3">
+          <div className="pt-2 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs text-center"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs shadow-md shadow-red-600/20 font-mono uppercase tracking-wider"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs shadow-md shadow-red-600/20 font-mono uppercase tracking-wider text-center"
             >
               Register Opportunity
             </button>

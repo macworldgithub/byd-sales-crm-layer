@@ -85,11 +85,11 @@ export function VirtualYardView() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={handleRefreshFromVy}
             disabled={isRefreshing}
-            className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center gap-1.5 shadow-sm"
+            className="w-full sm:w-auto justify-center px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center gap-1.5 shadow-sm"
           >
             <RefreshCw className={`w-4 h-4 text-purple-600 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>Poll VY Changes</span>
@@ -98,9 +98,9 @@ export function VirtualYardView() {
       </div>
 
       {/* Filter Row */}
-      <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 flex-1 min-w-[280px] flex-wrap">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
+      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:flex items-center gap-2.5 flex-1 w-full">
+          <div className="relative w-full lg:max-w-xs">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
@@ -114,7 +114,7 @@ export function VirtualYardView() {
           <select
             value={modelFilter}
             onChange={(e) => handleFilterChange('model', e.target.value)}
-            className="text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            className="w-full lg:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
           >
             <option value="All">All BYD Models</option>
             {models.filter((m) => m !== 'All').map((m) => (
@@ -127,7 +127,7 @@ export function VirtualYardView() {
           <select
             value={statusFilter}
             onChange={(e) => handleFilterChange('status', e.target.value)}
-            className="text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            className="w-full lg:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
           >
             <option value="All">All Statuses</option>
             <option value="Available">Available for Sale</option>
@@ -137,14 +137,14 @@ export function VirtualYardView() {
           </select>
         </div>
 
-        <span className="text-xs font-mono text-slate-500">
+        <span className="text-xs font-mono text-slate-500 shrink-0 text-right sm:text-left pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
           Showing <strong className="text-slate-900 font-bold">{vyStock.length}</strong> of{' '}
           <strong className="text-slate-900 font-bold">{vyStockPagination?.total?.toLocaleString() ?? vyStock.length}</strong> vehicles
         </span>
       </div>
 
       {/* Stock Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
         {vyStock.map((stock) => (
           <div
             key={stock.stock_id}

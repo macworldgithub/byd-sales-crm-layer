@@ -22,10 +22,18 @@ interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onOpenQuickDeal?: () => void;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
-export function Sidebar({ activeTab, setActiveTab, onOpenQuickDeal }: SidebarProps) {
-  const { currentRole, allocations, opportunities, deliveryWatch } = useCrm();
+export function Sidebar({
+  activeTab,
+  setActiveTab,
+  onOpenQuickDeal,
+  isMobileOpen = false,
+  onCloseMobile,
+}: SidebarProps) {
+  const { currentRole, allocations, opportunities, deliveryWatch, selectedSite } = useCrm();
 
   const pendingAllocationsCount = allocations.filter((a) => a.status === 'pending' || a.status === 'escalated').length;
   const overdueDealsCount = opportunities.filter((o) => o.is_overdue).length;
@@ -65,10 +73,10 @@ export function Sidebar({ activeTab, setActiveTab, onOpenQuickDeal }: SidebarPro
     { id: 'audit', label: 'Audit & ACMA', icon: ShieldCheck },
   ];
 
-  return (
-    <aside className="hidden md:flex flex-col w-64 bg-[#171b22] text-slate-200 h-screen sticky top-0 shrink-0 border-r border-white/10 z-40">
+  const renderNavContent = (isMobile = false) => (
+    <>
       {/* Brand Header */}
-      <div className="p-4 pb-3 border-b border-white/10">
+      <div className="p-4 pb-3 border-b border-white/10 flex items-center justify-between">
         <div className="brand-lockup">
           <div className="brand-plate shadow-sm">
             <img
@@ -76,7 +84,6 @@ export function Sidebar({ activeTab, setActiveTab, onOpenQuickDeal }: SidebarPro
               alt="BYD Sales Desk"
               className="h-6 w-auto object-contain"
               onError={(e) => {
-                // Graceful fallback to text if image path is altered
                 (e.target as HTMLElement).style.display = 'none';
               }}
             />
@@ -87,6 +94,25 @@ export function Sidebar({ activeTab, setActiveTab, onOpenQuickDeal }: SidebarPro
             <span>OmniSuiteAI</span>
           </div>
         </div>
+
+        {isMobile && onCloseMobile && (
+          <button
+            onClick={onCloseMobile}
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Close menu"
+          >
+            <span className="text-xl leading-none">✕</span>
+          </button>
+        )}
+      </div>
+
+      {/* Dealership Scope Badge (useful on mobile) */}
+      <div className="px-4 py-2 bg-white/5 border-b border-white/5 flex items-center justify-between text-[11px] text-slate-300">
+        <span className="text-slate-400">Location:</span>
+        <span className="font-semibold text-white flex items-center gap-1 font-mono">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#e60012] inline-block animate-pulse" />
+          {selectedSite}
+        </span>
       </div>
 
       {/* Navigation Links */}
@@ -103,7 +129,10 @@ export function Sidebar({ activeTab, setActiveTab, onOpenQuickDeal }: SidebarPro
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    if (isMobile && onCloseMobile) onCloseMobile();
+                  }}
                   data-active={isActive}
                   className="sidebar-link w-full text-left flex items-center justify-between group"
                 >
@@ -147,7 +176,10 @@ export function Sidebar({ activeTab, setActiveTab, onOpenQuickDeal }: SidebarPro
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    if (isMobile && onCloseMobile) onCloseMobile();
+                  }}
                   data-active={isActive}
                   className="sidebar-link w-full text-left flex items-center justify-between group"
                 >
@@ -169,13 +201,42 @@ export function Sidebar({ activeTab, setActiveTab, onOpenQuickDeal }: SidebarPro
       {/* Footer Quick Action */}
       <div className="p-3 border-t border-white/10 bg-[#13171e]">
         <button
-          onClick={onOpenQuickDeal}
+          onClick={() => {
+            if (onOpenQuickDeal) onOpenQuickDeal();
+            if (isMobile && onCloseMobile) onCloseMobile();
+          }}
           className="w-full py-2.5 px-3 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-950/40 transition-all font-mono uppercase tracking-wider"
         >
           <Sparkles className="w-3.5 h-3.5" />
           <span>+ Register Deal</span>
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop Persistent Sidebar */}
+      <aside className="hidden md:flex flex-col w-64 bg-[#171b22] text-slate-200 h-screen sticky top-0 shrink-0 border-r border-white/10 z-40">
+        {renderNavContent(false)}
+      </aside>
+
+      {/* Mobile Drawer Slide-over */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex animate-in fade-in duration-200">
+          {/* Backdrop */}
+          <div
+            onClick={onCloseMobile}
+            className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm transition-opacity"
+            aria-hidden="true"
+          />
+
+          {/* Drawer panel */}
+          <aside className="relative z-10 w-72 max-w-[85vw] bg-[#171b22] text-slate-200 h-full flex flex-col shadow-2xl border-r border-white/10 animate-in slide-in-from-left duration-200">
+            {renderNavContent(true)}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

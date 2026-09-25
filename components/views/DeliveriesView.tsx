@@ -73,9 +73,9 @@ export function DeliveriesView() {
       </div>
 
       {/* Filter Row */}
-      <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 flex-1 min-w-[280px]">
-          <div className="relative flex-1 max-w-sm">
+      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 w-full">
+          <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
@@ -89,7 +89,7 @@ export function DeliveriesView() {
           <select
             value={stageFilter}
             onChange={(e) => handleFilterChange('stage', e.target.value)}
-            className="text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            className="w-full sm:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
           >
             <option value="All">All Delivery Stages</option>
             <option value="Scheduled">Scheduled</option>
@@ -100,9 +100,9 @@ export function DeliveriesView() {
           </select>
         </div>
 
-        <span className="text-xs font-mono text-slate-500">
+        <span className="text-xs font-mono text-slate-500 shrink-0 text-right sm:text-left pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
           Showing <strong className="text-slate-900 font-bold">{deliveryWatch.length}</strong> of{' '}
-          <strong className="text-slate-900 font-bold">{deliveryWatchPagination?.total ?? deliveryWatch.length}</strong> clients in handover
+          <strong className="text-slate-900 font-bold">{deliveryWatchPagination?.total ?? deliveryWatch.length}</strong> clients
         </span>
       </div>
 

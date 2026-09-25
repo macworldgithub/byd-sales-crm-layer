@@ -23,12 +23,24 @@ import { MergeCustomerModal } from '@/components/modals/MergeCustomerModal';
 import { ToastContainer } from '@/components/ui/Toast';
 import { useCrm } from '@/lib/crmContext';
 import { Customer, Opportunity } from '@/lib/types';
+import {
+  LayoutDashboard,
+  GitBranch,
+  Inbox,
+  Users,
+  Menu,
+} from 'lucide-react';
 
 export default function SalesCrmApp() {
-  const { toasts, removeToast } = useCrm();
+  const { toasts, removeToast, allocations, opportunities } = useCrm();
 
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<string>('home');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Counts for mobile badges
+  const pendingAllocationsCount = allocations.filter((a) => a.status === 'pending' || a.status === 'escalated').length;
+  const overdueDealsCount = opportunities.filter((o) => o.is_overdue).length;
 
   // Modal states
   const [selected360Customer, setSelected360Customer] = useState<Customer | null>(null);
@@ -39,20 +51,23 @@ export default function SalesCrmApp() {
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-[#f4f5f7]">
-      {/* Dark Graphite Sidebar matching byd-sales-floor */}
+    <div className="flex min-h-screen bg-[#f4f5f7] overflow-x-hidden">
+      {/* Dark Graphite Sidebar matching byd-sales-floor (Desktop & Mobile Drawer) */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenQuickDeal={() => setIsAddDealOpen(true)}
+        isMobileOpen={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
       {/* Main Content Column */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header with Global Search, Site Switcher, Role Switcher */}
+      <div className="flex-1 flex flex-col min-w-0 w-full">
+        {/* Header with Global Search, Site Switcher, Role Switcher, Mobile Toggle */}
         <Header
           onSelectCustomer={(cust) => setSelected360Customer(cust)}
           onOpenQuickDeal={() => setIsAddDealOpen(true)}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
 
         {/* Scrollable Main Area */}
@@ -117,6 +132,63 @@ export default function SalesCrmApp() {
           </AnimatePresence>
         </main>
       </div>
+
+      {/* Mobile Bottom Quick Navigation Bar (< md) */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#171b22] border-t border-white/10 md:hidden flex items-center justify-around px-2 py-2 shadow-2xl backdrop-blur-md">
+        <button
+          onClick={() => setActiveTab('home')}
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-lg text-[10px] font-semibold transition-colors ${
+            activeTab === 'home' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <LayoutDashboard className={`w-4 h-4 ${activeTab === 'home' ? 'text-[#e60012]' : ''}`} />
+          <span>Home</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('pipeline')}
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-lg text-[10px] font-semibold relative transition-colors ${
+            activeTab === 'pipeline' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <GitBranch className={`w-4 h-4 ${activeTab === 'pipeline' ? 'text-[#e60012]' : ''}`} />
+          <span>Pipeline</span>
+          {overdueDealsCount > 0 && (
+            <span className="absolute top-0.5 right-1 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-[#171b22]" />
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('inbox')}
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-lg text-[10px] font-semibold relative transition-colors ${
+            activeTab === 'inbox' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Inbox className={`w-4 h-4 ${activeTab === 'inbox' ? 'text-[#e60012]' : ''}`} />
+          <span>Inbox</span>
+          {pendingAllocationsCount > 0 && (
+            <span className="absolute top-0.5 right-1.5 w-2 h-2 rounded-full bg-[#e60012] ring-2 ring-[#171b22]" />
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('customers')}
+          className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-lg text-[10px] font-semibold transition-colors ${
+            activeTab === 'customers' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Users className={`w-4 h-4 ${activeTab === 'customers' ? 'text-[#e60012]' : ''}`} />
+          <span>360 Cust</span>
+        </button>
+
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="flex flex-col items-center gap-1 py-1 px-2.5 rounded-lg text-[10px] font-semibold text-slate-400 hover:text-white transition-colors"
+        >
+          <Menu className="w-4 h-4 text-slate-300" />
+          <span>More</span>
+        </button>
+      </nav>
 
       {/* Hero Customer 360 Modal (§5.1 & AC-1) */}
       <Customer360Modal

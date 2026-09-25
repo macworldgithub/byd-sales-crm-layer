@@ -65,19 +65,19 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[92vh]">
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-100 text-[#e60012] flex items-center justify-center font-bold">
+        <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-red-100 text-[#e60012] flex items-center justify-center font-bold shrink-0">
               <UserPlus className="w-5 h-5" />
             </div>
             <div>
               <span className="text-[10px] font-bold text-[#e60012] uppercase tracking-wider font-mono">
                 Customer 360 Record
               </span>
-              <h3 className="text-lg font-bold text-slate-900">Create New Customer</h3>
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">Create New Customer</h3>
             </div>
           </div>
           <button
@@ -115,7 +115,7 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
         )}
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
           <div>
             <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
               Full Name or Contact Person *
@@ -241,17 +241,17 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
             />
           </div>
 
-          <div className="pt-2 flex items-center justify-end gap-3">
+          <div className="pt-2 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs text-center"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs shadow-md shadow-red-600/20 font-mono uppercase tracking-wider"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs shadow-md shadow-red-600/20 font-mono uppercase tracking-wider text-center"
             >
               Create Customer Record
             </button>

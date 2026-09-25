@@ -76,24 +76,24 @@ export function HomeView({
         </div>
 
         {/* Quick Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <button
             onClick={onOpenQuickDeal}
-            className="signal-button px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg uppercase tracking-wider font-mono"
+            className="signal-button flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg uppercase tracking-wider font-mono min-w-[140px]"
           >
             <Sparkles className="w-4 h-4" />
             <span>+ Register Deal</span>
           </button>
           <button
             onClick={onOpenAddCustomer}
-            className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center gap-1.5 shadow-sm"
+            className="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm min-w-[120px]"
           >
             <Users className="w-4 h-4 text-slate-500" />
             <span>Add Customer</span>
           </button>
           <button
             onClick={onOpenBookDrive}
-            className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center gap-1.5 shadow-sm"
+            className="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm min-w-[110px]"
           >
             <Calendar className="w-4 h-4 text-slate-500" />
             <span>Book Drive</span>
@@ -343,14 +343,14 @@ export function HomeView({
                   </div>
 
                   {/* Next Step Banner */}
-                  <div className="flex items-center justify-between text-xs p-2.5 rounded-lg bg-white border border-slate-200 flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs p-2.5 rounded-lg bg-white border border-slate-200 gap-2.5">
+                    <div className="flex items-center gap-2 min-w-0">
                       <Clock
-                        className={`w-3.5 h-3.5 ${
+                        className={`w-3.5 h-3.5 shrink-0 ${
                           opp.is_overdue ? 'text-red-500 animate-pulse' : 'text-slate-400'
                         }`}
                       />
-                      <span className="text-slate-700">
+                      <span className="text-slate-700 truncate sm:whitespace-normal">
                         {opp.is_overdue ? (
                           <strong className="text-red-600 uppercase font-mono mr-1">[Overdue SLA]</strong>
                         ) : null}
@@ -358,11 +358,11 @@ export function HomeView({
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto w-full sm:w-auto">
                       {opp.stage === 'Negotiation' && (
                         <button
                           onClick={() => onOpenMarkSold(opp)}
-                          className="px-3 py-1.5 rounded-lg bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-[11px] shadow-sm uppercase tracking-wider font-mono flex items-center gap-1"
+                          className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-[11px] shadow-sm uppercase tracking-wider font-mono flex items-center justify-center gap-1"
                         >
                           <Sparkles className="w-3 h-3" />
                           <span>Mark Sold</span>
@@ -373,7 +373,7 @@ export function HomeView({
                           const cust = customers.find((c) => c.customer_id === opp.customer_id);
                           if (cust) onSelectCustomer(cust);
                         }}
-                        className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px]"
+                        className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] text-center"
                       >
                         Open 360 Record
                       </button>

@@ -92,13 +92,13 @@ export function PaginationControls({
       </div>
 
       {/* Right: Page navigation buttons */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-wrap justify-center">
         {/* First page */}
         <button
           onClick={() => onPageChange(1)}
           disabled={page <= 1}
           title="First page"
-          className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="hidden sm:inline-flex p-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronsLeft className="w-3.5 h-3.5" />
         </button>
@@ -114,7 +114,7 @@ export function PaginationControls({
         </button>
 
         {/* Numbered pages */}
-        <div className="flex items-center gap-1 px-1">
+        <div className="flex items-center gap-0.5 sm:gap-1 px-0.5 sm:px-1 overflow-x-auto max-w-full">
           {getPageNumbers().map((p, idx) => {
             if (p === '...') {
               return (
@@ -131,7 +131,7 @@ export function PaginationControls({
               <button
                 key={`page-${pageNum}`}
                 onClick={() => onPageChange(pageNum)}
-                className={`min-w-[28px] h-7 px-2 rounded-lg font-bold font-mono text-xs transition-all ${
+                className={`min-w-[26px] sm:min-w-[28px] h-7 px-1.5 sm:px-2 rounded-lg font-bold font-mono text-xs transition-all ${
                   isActive
                     ? 'bg-[#e60012] text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -158,7 +158,7 @@ export function PaginationControls({
           onClick={() => onPageChange(totalPages)}
           disabled={page >= totalPages}
           title="Last page"
-          className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="hidden sm:inline-flex p-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronsRight className="w-3.5 h-3.5" />
         </button>

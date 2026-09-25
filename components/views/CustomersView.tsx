@@ -71,17 +71,17 @@ export function CustomersView({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <button
             onClick={onOpenMergeModal}
-            className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center gap-1.5 shadow-sm"
+            className="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm min-w-[130px]"
           >
             <GitMerge className="w-4 h-4 text-amber-600" />
             <span>Merge Duplicates</span>
           </button>
           <button
             onClick={onOpenAddCustomer}
-            className="signal-button px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md uppercase tracking-wider font-mono"
+            className="signal-button flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md uppercase tracking-wider font-mono min-w-[130px]"
           >
             <UserPlus className="w-4 h-4" />
             <span>Add Customer</span>
@@ -90,9 +90,9 @@ export function CustomersView({
       </div>
 
       {/* Filter Row */}
-      <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 flex-1 min-w-[280px]">
-          <div className="relative flex-1 max-w-sm">
+      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 w-full">
+          <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
@@ -106,7 +106,7 @@ export function CustomersView({
           <select
             value={recordTypeFilter}
             onChange={(e) => handleFilterChange('recordType', e.target.value)}
-            className="text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            className="w-full sm:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
           >
             <option value="All">All Types</option>
             <option value="Individual">Individual Buyers</option>
@@ -116,15 +116,15 @@ export function CustomersView({
           </select>
         </div>
 
-        <span className="text-xs font-mono text-slate-500">
+        <span className="text-xs font-mono text-slate-500 shrink-0 text-right sm:text-left pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
           Showing <strong className="text-slate-900 font-bold">{customers.length}</strong> of{' '}
-          <strong className="text-slate-900 font-bold">{customersPagination?.total ?? customers.length}</strong> canonical records
+          <strong className="text-slate-900 font-bold">{customersPagination?.total ?? customers.length}</strong> records
         </span>
       </div>
 
       {/* Directory Table */}
       <div className="surface-card overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto touch-scroll">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-500 font-mono uppercase text-[10px] border-b border-slate-200 tracking-wider">
               <tr>
