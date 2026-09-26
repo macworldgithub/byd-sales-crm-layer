@@ -101,10 +101,12 @@ interface CrmContextType {
       secondary_salesperson?: string;
       deposit: number;
       finance_method?: string;
+      is_factory_order?: boolean;
     }
   ) => Promise<{ success: boolean; message: string }>;
 
   // Actions: Lead Intake & Phone Logging (§5.3, §5.9)
+  createAllocation: (data: Record<string, any>) => Promise<AllocationItem | null>;
   acceptAllocation: (allocationId: string) => void;
   reassignAllocation: (allocationId: string, targetConsultant: string) => void;
   requestMoreLeads: () => void;
@@ -797,6 +799,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
       secondary_salesperson?: string;
       deposit: number;
       finance_method?: string;
+      is_factory_order?: boolean;
     }
   ): Promise<{ success: boolean; message: string }> => {
     const opp = opportunities.find((o) => o.opportunity_id === opportunityId);
@@ -939,6 +942,21 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   };
 
   // Lead Intake Allocations (§5.3 & AC-4)
+  const createAllocation = async (data: Record<string, any>): Promise<AllocationItem | null> => {
+    try {
+      const res = await allocationApi.createAllocation(data);
+      if (res.success && res.data) {
+        setAllocations((prev) => [res.data!, ...prev]);
+        addToast('success', 'Lead Allocated', `New lead for ${data.name || 'prospect'} pushed to queue with 15m SLA.`);
+        return res.data;
+      }
+    } catch (err) {
+      console.warn('createAllocation error:', err);
+      addToast('error', 'Allocation Failed', 'Failed to create inbound lead allocation.');
+    }
+    return null;
+  };
+
   const acceptAllocation = async (allocationId: string) => {
     try {
       await allocationApi.acceptAllocation(allocationId, currentUser.name);
@@ -1362,6 +1380,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         updateOpportunityStage,
         updateOpportunity,
         executeMarkSold,
+        createAllocation,
         acceptAllocation,
         reassignAllocation,
         requestMoreLeads,

@@ -247,7 +247,8 @@ export function Customer360Modal({
           </div>
 
           {/* Quick Stats Bar & Upstream/Downstream Deep Links (§5.1, §5.2) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200 text-xs">
+          {/* Quick Stats Bar & Upstream/Downstream Deep Links (§5.1, §5.2) */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-slate-200 text-xs">
             <div className="p-2 rounded-xl bg-white border border-slate-200">
               <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
                 Open Deal Value
@@ -259,10 +260,22 @@ export function Customer360Modal({
 
             <div className="p-2 rounded-xl bg-white border border-slate-200">
               <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
+                Next Cadence Activity
+              </span>
+              <span className="text-xs font-semibold text-slate-800 truncate block">
+                {activeOpp?.next_action_text || 'Consultation follow-up'}
+              </span>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {activeOpp?.next_action_at ? new Date(activeOpp.next_action_at).toLocaleDateString('en-AU') : 'No Date'}
+              </span>
+            </div>
+
+            <div className="p-2 rounded-xl bg-white border border-slate-200">
+              <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
                 Active Vehicle & Stock
               </span>
               <span className="text-xs font-semibold text-slate-800 truncate block">
-                {activeOpp?.model || 'BYD Range'} · {activeOpp?.vy_stock_id || 'Factory Order'}
+                {activeOpp?.model || 'BYD Range'} · {activeOpp?.vy_stock_id || 'Factory Slot'}
               </span>
             </div>
 
@@ -410,7 +423,14 @@ export function Customer360Modal({
                             {evt.source}
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-400 font-mono">{evt.occurred_at}</span>
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                          {evt.is_edited && (
+                            <span className="text-amber-700 bg-amber-50 border border-amber-200 px-1 rounded text-[9px] font-bold">
+                              Edited
+                            </span>
+                          )}
+                          <span>{evt.timestamp_aest || evt.occurred_at}</span>
+                        </div>
                       </div>
 
                       <p className="text-xs text-slate-700 leading-relaxed">{evt.content}</p>
@@ -419,12 +439,12 @@ export function Customer360Modal({
                         <span>By {evt.author}</span>
                         {evt.deep_link && (
                           <a
-                            href={evt.deep_link.url}
+                            href={typeof evt.deep_link === 'string' ? evt.deep_link : evt.deep_link.url}
                             target="_blank"
                             rel="noreferrer"
                             className="text-[#e60012] hover:underline flex items-center gap-1 font-semibold"
                           >
-                            <span>{evt.deep_link.label}</span>
+                            <span>{typeof evt.deep_link === 'string' ? 'View External Record' : evt.deep_link.label}</span>
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         )}
@@ -498,6 +518,26 @@ export function Customer360Modal({
                       </strong>
                     </div>
                   </div>
+
+                  {/* Competitor & Loss Reason Notes (§5.4) */}
+                  {opp.competitor_notes && (
+                    <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60 text-xs text-amber-900">
+                      <span className="font-bold block font-mono text-[10px] uppercase text-amber-700">
+                        Competitor & Cross-Shop Notes (§5.4):
+                      </span>
+                      <p className="mt-0.5">{opp.competitor_notes}</p>
+                    </div>
+                  )}
+
+                  {opp.lost_reason && (
+                    <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-900">
+                      <span className="font-bold block font-mono text-[10px] uppercase text-red-700">
+                        Lost / Parked Reason:
+                      </span>
+                      <p className="mt-0.5 font-semibold">{opp.lost_reason}</p>
+                      {opp.lost_notes && <p className="mt-0.5 text-red-700">{opp.lost_notes}</p>}
+                    </div>
+                  )}
 
                   {/* Next Action SLA */}
                   <div className="flex items-center justify-between text-xs pt-1">

@@ -15,6 +15,7 @@ import {
   ExternalLink,
   ShieldAlert,
   ShieldCheck,
+  Plus,
 } from 'lucide-react';
 import { useCrm } from '@/lib/crmContext';
 import { AllocationItem, Customer } from '@/lib/types';
@@ -33,6 +34,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
     customers,
     currentUser,
     selectedSite,
+    createAllocation,
     acceptAllocation,
     reassignAllocation,
     requestMoreLeads,
@@ -43,6 +45,15 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
   const [targetConsultant, setTargetConsultant] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // Direct Intake Modal State
+  const [showIntakeModal, setShowIntakeModal] = useState(false);
+  const [intakeName, setIntakeName] = useState('');
+  const [intakePhone, setIntakePhone] = useState('');
+  const [intakeEmail, setIntakeEmail] = useState('');
+  const [intakeVehicle, setIntakeVehicle] = useState('BYD Seal');
+  const [intakeConsultant, setIntakeConsultant] = useState(currentUser.name);
+  const [isSubmittingIntake, setIsSubmittingIntake] = useState(false);
 
   const consultants = ALL_USERS.filter((u) => u.role === 'consultant');
 
@@ -61,6 +72,32 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
     setReassignModalAlloc(null);
   };
 
+  const handleDirectIntakeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!intakeName || !intakePhone) return;
+    setIsSubmittingIntake(true);
+    try {
+      await createAllocation({
+        lead_prospect_id: `LP-${Date.now().toString().slice(-6)}`,
+        name: intakeName,
+        phone: intakePhone,
+        email: intakeEmail,
+        vehicle: intakeVehicle,
+        assigned_to: intakeConsultant || currentUser.name,
+        dealership: selectedSite !== 'All Sites' ? selectedSite : currentUser.site,
+        source: 'Direct Intake / BDC Push',
+        intent_summary: `Direct walk-in / BDC intake inquiry for ${intakeVehicle}. Immediate contact requested.`,
+        urgency: 'high',
+      });
+      setShowIntakeModal(false);
+      setIntakeName('');
+      setIntakePhone('');
+      setIntakeEmail('');
+    } finally {
+      setIsSubmittingIntake(false);
+    }
+  };
+
   return (
     <div className="view-stack">
       {/* Intro Header */}
@@ -77,6 +114,13 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
+          <button
+            onClick={() => setShowIntakeModal(true)}
+            className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 shadow-sm uppercase tracking-wider font-mono"
+          >
+            <Plus className="w-4 h-4 text-[#e60012]" />
+            <span>Direct Intake (BDC Push)</span>
+          </button>
           <button
             onClick={requestMoreLeads}
             className="signal-button w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md uppercase tracking-wider font-mono"
@@ -353,6 +397,131 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                   className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs font-mono uppercase"
                 >
                   Confirm Route
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Direct Intake / BDC Push Modal (§5.3 & AC-4) */}
+      {showIntakeModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#e60012] font-bold">
+                  Lead Intake Handshake (§5.3)
+                </span>
+                <h3 className="text-base font-bold text-slate-900">Direct Inbound Lead Push</h3>
+              </div>
+              <button
+                onClick={() => setShowIntakeModal(false)}
+                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleDirectIntakeSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Customer Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. David Morrison"
+                  value={intakeName}
+                  onChange={(e) => setIntakeName(e.target.value)}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Mobile Phone *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="04xx xxx xxx"
+                    value={intakePhone}
+                    onChange={(e) => setIntakePhone(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="david@example.com"
+                    value={intakeEmail}
+                    onChange={(e) => setIntakeEmail(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Vehicle Model
+                  </label>
+                  <select
+                    value={intakeVehicle}
+                    onChange={(e) => setIntakeVehicle(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                  >
+                    <option value="BYD Seal">BYD Seal</option>
+                    <option value="BYD Atto 3">BYD Atto 3</option>
+                    <option value="BYD Sealion 6">BYD Sealion 6</option>
+                    <option value="BYD Sealion 7">BYD Sealion 7</option>
+                    <option value="BYD Shark 6">BYD Shark 6</option>
+                    <option value="BYD Dolphin">BYD Dolphin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Assign Consultant
+                  </label>
+                  <select
+                    value={intakeConsultant}
+                    onChange={(e) => setIntakeConsultant(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                  >
+                    {consultants.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name} ({c.site})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500">
+                <p>
+                  <strong>SLA Policy:</strong> Upon creation, a 15-minute response SLA timer begins immediately. If unaccepted, the floor manager will be alerted.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowIntakeModal(false)}
+                  className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingIntake}
+                  className="px-4 py-2 rounded-xl bg-[#e60012] hover:bg-[#c40010] text-white font-bold text-xs font-mono uppercase tracking-wider shadow-sm flex items-center gap-1.5"
+                >
+                  {isSubmittingIntake ? 'Allocating...' : 'Push to Sales Floor'}
                 </button>
               </div>
             </form>

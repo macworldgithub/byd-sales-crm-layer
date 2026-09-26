@@ -33,6 +33,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
   const [splitPercent, setSplitPercent] = useState('100');
   const [deposit, setDeposit] = useState('2000');
   const [financeMethod, setFinanceMethod] = useState('Finance');
+  const [isFactoryOrder, setIsFactoryOrder] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Initialize defaults when modal opens or opportunity changes
@@ -40,6 +41,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
     if (opportunity) {
       setSaleType(opportunity.sale_type || 'Retail');
       setPrimarySalesperson(opportunity.owner_name || currentUser.name);
+      setIsFactoryOrder(opportunity.order_type === 'Factory Order');
       if (opportunity.vy_stock_id) {
         setSelectedStockId(opportunity.vy_stock_id);
         const matched = vyStock.find((s) => s.stock_id === opportunity.vy_stock_id);
@@ -51,6 +53,8 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
         if (available) {
           setSelectedStockId(available.stock_id);
           setVin(available.vin);
+        } else if (opportunity.order_type === 'Factory Order') {
+          setVin('');
         } else {
           setVin('6T1BYD' + Math.random().toString(36).substring(2, 10).toUpperCase());
         }
@@ -62,21 +66,22 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vin.trim()) {
-      alert('Please enter or select a valid vehicle VIN.');
+    if (!vin.trim() && !isFactoryOrder) {
+      alert('Please enter a vehicle VIN or check "Factory Order Slot" (§7.5, Step 1).');
       return;
     }
 
     setIsSubmitting(true);
     try {
       await executeMarkSold(opportunity.opportunity_id, {
-        vin: vin.trim(),
+        vin: vin.trim() || (isFactoryOrder ? 'FACTORY_ORDER_PENDING' : ''),
         vy_stock_id: selectedStockId || undefined,
         sale_type: saleType,
         primary_salesperson: primarySalesperson,
         secondary_salesperson: secondarySalesperson || undefined,
         deposit: parseFloat(deposit) || 0,
         finance_method: financeMethod,
+        is_factory_order: isFactoryOrder,
       });
       onClose();
     } finally {
@@ -194,12 +199,24 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
                 </span>
                 <input
                   type="text"
-                  required
+                  required={!isFactoryOrder}
                   value={vin}
                   onChange={(e) => setVin(e.target.value)}
-                  placeholder="e.g. 6T1BYD779X2910488"
+                  placeholder={isFactoryOrder ? 'Optional for Factory Order slot' : 'e.g. 6T1BYD779X2910488'}
                   className="w-full text-xs font-mono uppercase p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-slate-400 outline-none font-semibold text-slate-900"
                 />
+                <label className="flex items-center gap-2 mt-1.5 cursor-pointer text-[11px] text-slate-600 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={isFactoryOrder}
+                    onChange={(e) => {
+                      setIsFactoryOrder(e.target.checked);
+                      if (e.target.checked && !vin) setVin('FACTORY_ORDER_PENDING');
+                    }}
+                    className="w-3.5 h-3.5 text-[#e60012] rounded border-slate-300"
+                  />
+                  <span>Factory Order Slot (VIN not yet allocated / Slotted for OEM build)</span>
+                </label>
               </div>
             </div>
           </div>

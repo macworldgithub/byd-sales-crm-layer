@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Settings,
   Sparkles,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { ASSET_PATHS } from '@/lib/data';
 import { useCrm } from '@/lib/crmContext';
@@ -70,7 +71,9 @@ export function Sidebar({
 
   const managerNav = [
     { id: 'team', label: 'Team & Targets', icon: BarChart3 },
+    { id: 'reports', label: 'Reports & Exports', icon: FileSpreadsheet },
     { id: 'audit', label: 'Audit & ACMA', icon: ShieldCheck },
+    { id: 'settings', label: 'CRM Settings', icon: Settings },
   ];
 
   const renderNavContent = (isMobile = false) => (

@@ -14,6 +14,8 @@ import { DeliveriesView } from '@/components/views/DeliveriesView';
 import { SalesLogView } from '@/components/views/SalesLogView';
 import { TeamScoreboardView } from '@/components/views/TeamScoreboardView';
 import { AuditView } from '@/components/views/AuditView';
+import { ReportsView } from '@/components/views/ReportsView';
+import { SettingsView } from '@/components/views/SettingsView';
 import { Customer360Modal } from '@/components/modals/Customer360Modal';
 import { MarkSoldModal } from '@/components/modals/MarkSoldModal';
 import { AddDealModal } from '@/components/modals/AddDealModal';
@@ -127,7 +129,11 @@ export default function SalesCrmApp() {
 
               {activeTab === 'team' && <TeamScoreboardView />}
 
+              {activeTab === 'reports' && <ReportsView />}
+
               {activeTab === 'audit' && <AuditView />}
+
+              {activeTab === 'settings' && <SettingsView />}
             </motion.div>
           </AnimatePresence>
         </main>

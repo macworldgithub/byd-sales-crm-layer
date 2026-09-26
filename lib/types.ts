@@ -11,6 +11,7 @@ export type UserRole =
   | 'manager'
   | 'bdc'
   | 'delivery'
+  | 'site_admin'
   | 'super_admin';
 
 export interface UserProfile {
@@ -89,6 +90,7 @@ export interface Opportunity {
   order_type: 'Stock' | 'Factory Order';
   vy_stock_id?: string;
   vy_order_id?: string;
+  vin?: string;
   sale_type: SaleType;
   list_price: number;
   discount: number;
@@ -111,7 +113,9 @@ export interface Opportunity {
   delivery_stage?: 'Scheduled' | 'Pre-Delivery Inspection' | 'In Transit' | 'Ready for Pickup' | 'Delivered';
   lost_reason?: 'Price' | 'Stock Unavailable' | 'Chose Competitor' | 'Finance Declined' | 'Opted Out' | 'Other';
   lost_notes?: string;
-  sync_status: 'synced' | 'vy_pending' | 'delivery_pending' | 'failed';
+  competitor_notes?: string;
+  delivery_sync_pending?: boolean;
+  sync_status: 'synced' | 'vy_pending' | 'delivery_pending' | 'failed' | 'pending';
   created_at: string;
   updated_at: string;
 }
@@ -144,16 +148,25 @@ export interface TimelineEvent {
   customer_id: string;
   opportunity_id?: string;
   occurred_at: string; // Humanized or AEST timestamp
+  timestamp_aest?: string;
   source: TimelineEventSource;
   type: TimelineEventType;
   author: string;
   title: string;
   content: string;
   visibility: 'internal' | 'customer-facing';
+  is_edited?: boolean;
+  edit_history?: Array<{
+    previous_content: string;
+    edited_by: string;
+    edited_at: string;
+    edited_at_aest?: string;
+  }>;
+  deleted_at?: string;
   deep_link?: {
     label: string;
     url: string;
-  };
+  } | string;
 }
 
 export interface AllocationItem {
@@ -168,8 +181,9 @@ export interface AllocationItem {
   ai_score: number;
   last_sms_summary: string;
   allocated_at: string;
-  sla_minutes: number;
-  sla_deadline: string;
+  sla_minutes?: number;
+  sla_deadline?: string;
+  sla_expires_at?: string;
   status: 'pending' | 'accepted' | 'escalated' | 'reassigned';
   assigned_to: string;
   appointment_booked?: string;

@@ -80,11 +80,17 @@ export function SalesLogView() {
   const totalWrittenAmount = filteredSalesLog.reduce((sum, s) => sum + s.amount, 0);
   const totalWrittenGross = filteredSalesLog.reduce((sum, s) => sum + (s.gross || 0), 0);
 
-  const handleReconcileAll = () => {
-    salesLog.forEach((row) => {
-      if (!row.reconciled) reconcileSalesLogRow(row.sales_log_id);
-    });
-    addToast('success', 'Nightly Reconciliation Batch Complete', 'All unreconciled Sales Log rows matched against active CRM opportunities.');
+  const handleReconcileAll = async () => {
+    try {
+      const { syncApi } = await import('@/lib/api');
+      await syncApi.reconcileAll(selectedSite !== 'All Sites' ? selectedSite : undefined);
+      salesLog.forEach((row) => {
+        if (!row.reconciled) reconcileSalesLogRow(row.sales_log_id);
+      });
+      addToast('success', 'Reconciliation Batch Complete', 'All unreconciled Sales Log rows matched and persisted to database.');
+    } catch (err: any) {
+      addToast('error', 'Reconcile Failed', err.message || 'Could not complete batch reconciliation.');
+    }
   };
 
   const handleExportCsv = () => {

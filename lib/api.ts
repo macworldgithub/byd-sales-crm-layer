@@ -131,6 +131,18 @@ export const customerApi = {
       method: 'POST',
       body: JSON.stringify(note),
     }),
+  editTimelineNote: (customerId: string, noteId: string, content: string, author?: string) =>
+    fetchApi<TimelineEvent>(`/crm/customers/${customerId}/notes/${noteId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ content, author }),
+    }),
+  deleteTimelineNote: (customerId: string, noteId: string, reason?: string) =>
+    fetchApi<{ success: boolean }>(`/crm/customers/${customerId}/notes/${noteId}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ reason }),
+    }),
+  exportCustomersCsvUrl: (params?: Record<string, string | number | boolean | undefined>) =>
+    `${getBaseUrl()}/crm/customers/export-csv${buildQueryString(params)}`,
 };
 
 // ─── CRM Opportunities API ─────────────────────────────────────────────────
@@ -145,6 +157,8 @@ export const opportunityApi = {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
+  exportOpportunitiesCsvUrl: (params?: Record<string, string | number | boolean | undefined>) =>
+    `${getBaseUrl()}/crm/opportunities/export-csv${buildQueryString(params)}`,
   // Single Orchestrated Mark Sold Transaction (§7.5)
   markSold: (
     id: string,
@@ -157,6 +171,7 @@ export const opportunityApi = {
       secondary_salesperson?: string;
       deposit: number;
       finance_method?: string;
+      is_factory_order?: boolean;
     }
   ) =>
     fetchApi<{
@@ -164,6 +179,8 @@ export const opportunityApi = {
       salesLogId: string;
       deliveryClientId: string;
       vyOrderId: string;
+      deliverySyncSuccess: boolean;
+      deliverySyncPending?: boolean;
     }>(`/crm/opportunities/${id}/mark-sold`, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -174,6 +191,15 @@ export const opportunityApi = {
 export const allocationApi = {
   getAllocations: (params?: Record<string, string | number | boolean | undefined>) =>
     fetchApi<AllocationItem[]>(`/crm/allocations${buildQueryString(params)}`),
+  createAllocation: (data: Record<string, any>) =>
+    fetchApi<AllocationItem>('/crm/allocations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  checkSla: () =>
+    fetchApi<{ success: boolean; escalatedCount: number; allocations: string[] }>('/crm/allocations/check-sla', {
+      method: 'POST',
+    }),
   acceptAllocation: (id: string, consultantName: string) =>
     fetchApi<AllocationItem>(`/crm/allocations/${id}/accept`, {
       method: 'POST',
@@ -210,6 +236,13 @@ export const syncApi = {
     fetchApi<{ reconciled: boolean }>(`/crm/saleslog/${salesLogId}/reconcile`, {
       method: 'POST',
     }),
+  reconcileAll: (site?: string) =>
+    fetchApi<{ success: boolean; count: number; site: string }>('/crm/saleslog/reconcile-all', {
+      method: 'POST',
+      body: JSON.stringify({ site }),
+    }),
+  exportSalesLogCsvUrl: (params?: Record<string, string | number | boolean | undefined>) =>
+    `${getBaseUrl()}/crm/saleslog/export-csv${buildQueryString(params)}`,
   getDeliveryWatch: (params?: Record<string, string | number | boolean | undefined>) =>
     fetchApi<DeliveryHandoverWatch[]>(`/crm/delivery-watch${buildQueryString(params)}`),
   updateDeliveryNote: (clientId: string, note: string) =>
