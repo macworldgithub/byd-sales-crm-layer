@@ -16,18 +16,18 @@ import {
   CustomerDocument,
 } from './types';
 
-// Dynamic production URL resolution for Vercel deployments
+// Dynamic production URL resolution for VPS / production deployments
 const getBaseUrl = (): string => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
   if (typeof window !== 'undefined') {
-    // If running in production browser on Vercel or custom domain
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      return 'https://byd-sales-floor-backend.vercel.app/api';
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:4003/api';
     }
   }
-  return 'https://byd-sales-floor-backend.vercel.app/api';
+  // Production fallback
+  return 'https://sales-floor-backend.goodshowroom.com/api';
 };
 
 const TOKEN_KEY = 'byd_crm_token';
