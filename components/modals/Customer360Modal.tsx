@@ -69,7 +69,7 @@ export function Customer360Modal({
   } = useCrm();
 
   useEffect(() => {
-    if (customer?.customer_id) {
+    if (customer?.customer_id && customer.customer_id !== 'undefined') {
       fetchCustomerTimeline(customer.customer_id);
     }
   }, [customer?.customer_id]);

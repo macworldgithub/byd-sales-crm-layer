@@ -31,7 +31,7 @@ import {
   INITIAL_AUDIT_LOG,
   CONSULTANT_SCORES,
 } from './data';
-import { customerApi, opportunityApi, allocationApi, vyApi, syncApi, crmMessageApi, authApi, boardApi, getToken } from './api';
+import { customerApi, opportunityApi, allocationApi, vyApi, syncApi, crmMessageApi, authApi, boardApi, appointmentApi, getToken } from './api';
 
 export interface ToastMessage {
   id: string;
@@ -253,6 +253,32 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const fetchAppointments = useCallback(async (params: Record<string, any> = {}) => {
+    try {
+      const res = await appointmentApi.getAppointments(params);
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        const mapped: Appointment[] = res.data.map((a: any) => ({
+          appointment_id: a.appointment_id || a.appointmentId || a.id || `APT-${a._id}`,
+          customer_id: a.customer_id || a.leadId || '',
+          customer_name: a.customer_name || a.prospectName || 'Customer',
+          phone: a.phone || '',
+          type: a.type || 'Test Drive',
+          when: a.when || a.testDriveDate || new Date().toISOString(),
+          duration_minutes: a.duration_minutes || a.durationMinutes || 45,
+          vehicle: a.vehicle || 'BYD SEALION 7',
+          loop: a.loop || 'CBD Demo Loop',
+          consultant: a.consultant || a.consultantName || a.bookedBy || 'Consultant',
+          site: (a.site || a.dealership || a.location || 'Fairfield') as SiteLocation,
+          status: a.status || 'Confirmed',
+          notes: a.notes || '',
+        }));
+        setAppointments(mapped);
+      }
+    } catch (err) {
+      console.warn('fetchAppointments error:', err);
+    }
+  }, []);
+
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -335,10 +361,11 @@ export function CrmProvider({ children }: { children: ReactNode }) {
       fetchVyStock({ page: 1, limit: 20 });
       fetchSalesLog({ page: 1, limit: 50 });
       fetchDeliveryWatch({ page: 1, limit: 20 });
+      fetchAppointments({ limit: 50 });
       fetchScoreboards();
     };
     initSession();
-  }, [fetchCustomers, fetchOpportunities, fetchAllocations, fetchVyStock, fetchSalesLog, fetchDeliveryWatch, fetchScoreboards]);
+  }, [fetchCustomers, fetchOpportunities, fetchAllocations, fetchVyStock, fetchSalesLog, fetchDeliveryWatch, fetchAppointments, fetchScoreboards]);
 
   // Add Customer with Live Database Duplicate Detection (§5.1 & AC-1)
   const addCustomer = async (data: Partial<Customer>): Promise<Customer> => {
@@ -1276,40 +1303,83 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  // Appointment creation
-  const createAppointment = (appt: Partial<Appointment>) => {
-    const newAppt: Appointment = {
-      appointment_id: `APT-${Math.floor(500 + Math.random() * 499)}`,
+  // Appointment creation with MongoDB integration
+  const createAppointment = async (appt: Partial<Appointment>) => {
+    const siteVal = (appt.site || (selectedSite !== 'All Sites' ? selectedSite : 'Fairfield')) as SiteLocation;
+    const newApptData = {
       customer_id: appt.customer_id || 'CUST-0891',
       customer_name: appt.customer_name || 'Customer',
+      prospectName: appt.customer_name || 'Customer',
       phone: appt.phone || '+61400000000',
       type: appt.type || 'Test Drive',
       when: appt.when || new Date().toISOString(),
-      duration_minutes: appt.duration_minutes || 45,
+      durationMinutes: appt.duration_minutes || 45,
       vehicle: appt.vehicle || 'BYD SEALION 7',
       loop: appt.loop || 'CBD Demo Loop',
-      consultant: currentUser.name,
-      site: (appt.site || selectedSite !== 'All Sites' ? selectedSite : 'Fairfield') as SiteLocation,
-      status: 'Confirmed',
+      consultantName: currentUser.name,
+      site: siteVal,
+      dealership: siteVal,
+      status: appt.status || 'Confirmed',
       notes: appt.notes || '',
     };
-    setAppointments((prev) => [newAppt, ...prev]);
+
+    let createdAppt: Appointment = {
+      appointment_id: `APT-${Math.floor(500 + Math.random() * 499)}`,
+      customer_id: newApptData.customer_id,
+      customer_name: newApptData.customer_name,
+      phone: newApptData.phone,
+      type: newApptData.type as any,
+      when: newApptData.when,
+      duration_minutes: newApptData.durationMinutes,
+      vehicle: newApptData.vehicle,
+      loop: newApptData.loop,
+      consultant: currentUser.name,
+      site: siteVal,
+      status: 'Confirmed',
+      notes: newApptData.notes,
+    };
+
+    try {
+      const res = await appointmentApi.createAppointment(newApptData);
+      if (res.success && res.data) {
+        const a = res.data;
+        createdAppt = {
+          appointment_id: a.appointment_id || a.appointmentId || a.id || `APT-${a._id}`,
+          customer_id: a.customer_id || newApptData.customer_id,
+          customer_name: a.customer_name || a.prospectName || newApptData.customer_name,
+          phone: a.phone || newApptData.phone,
+          type: a.type || newApptData.type,
+          when: a.when || newApptData.when,
+          duration_minutes: a.duration_minutes || a.durationMinutes || 45,
+          vehicle: a.vehicle || newApptData.vehicle,
+          loop: a.loop || newApptData.loop,
+          consultant: a.consultant || a.consultantName || currentUser.name,
+          site: (a.site || siteVal) as SiteLocation,
+          status: a.status || 'Confirmed',
+          notes: a.notes || newApptData.notes,
+        };
+      }
+    } catch (err) {
+      console.warn('createAppointment API error, using local state fallback:', err);
+    }
+
+    setAppointments((prev) => [createdAppt, ...prev]);
 
     // Timeline event
     const evt: TimelineEvent = {
       event_id: `EVT-${Date.now().toString().slice(-4)}`,
-      customer_id: newAppt.customer_id,
+      customer_id: createdAppt.customer_id,
       occurred_at: 'Just now (AEST)',
       source: 'Sales CRM',
       type: 'appointment',
       author: currentUser.name,
-      title: `${newAppt.type} Booked: ${newAppt.vehicle}`,
-      content: `Scheduled for ${new Date(newAppt.when).toLocaleString()}. Route: ${newAppt.loop}. Notes: ${newAppt.notes}`,
+      title: `${createdAppt.type} Booked: ${createdAppt.vehicle}`,
+      content: `Scheduled for ${new Date(createdAppt.when).toLocaleString()}. Route: ${createdAppt.loop}. Notes: ${createdAppt.notes}`,
       visibility: 'internal',
     };
     setTimelineEvents((prev) => [evt, ...prev]);
 
-    addToast('success', 'Appointment Scheduled', `${newAppt.type} confirmed with ${newAppt.customer_name}.`);
+    addToast('success', 'Appointment Scheduled', `${createdAppt.type} confirmed with ${createdAppt.customer_name}.`);
   };
 
   // SMS Send (§5.9)
