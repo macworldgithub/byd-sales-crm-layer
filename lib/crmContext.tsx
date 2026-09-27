@@ -84,6 +84,7 @@ interface CrmContextType {
   unlinkCustomer: (customerId: string, linkType?: 'lead' | 'delivery' | 'all') => Promise<void>;
   toggleOptOut: (customerId: string) => void;
   addTimelineNote: (customerId: string, content: string, opportunityId?: string) => void;
+  addTimelineEmail: (customerId: string, email: { subject: string; body: string; to?: string; direction?: string }) => Promise<void>;
   fetchCustomerTimeline: (customerId: string) => Promise<void>;
 
   // Actions: Deals & Opportunities
@@ -613,6 +614,40 @@ export function CrmProvider({ children }: { children: ReactNode }) {
       'Note Recorded & Fanned Out',
       'Note visible on Lead Centre timeline and Delivery Centre client thread.'
     );
+  };
+
+  // Add Unified Timeline Email (§5.9)
+  const addTimelineEmail = async (
+    customerId: string,
+    email: { subject: string; body: string; to?: string; direction?: string }
+  ) => {
+    const newEvent: TimelineEvent = {
+      event_id: `EVT-EML-${Date.now().toString().slice(-4)}`,
+      customer_id: customerId,
+      occurred_at: 'Just now (AEST)',
+      source: 'Sales CRM',
+      type: 'email',
+      author: `${currentUser.name} (${currentUser.role})`,
+      title: email.subject || 'Customer Email Communication',
+      content: email.body,
+      visibility: 'internal',
+    };
+
+    setTimelineEvents((prev) => [newEvent, ...prev]);
+
+    try {
+      await customerApi.addTimelineEmail(customerId, {
+        author: currentUser.name,
+        subject: email.subject,
+        body: email.body,
+        to: email.to,
+        direction: email.direction || 'outbound',
+      });
+    } catch (err) {
+      console.warn('addTimelineEmail api error:', err);
+    }
+
+    addToast('success', 'Email Logged to Timeline', 'Email recorded on customer 360 unified timeline.');
   };
 
   // Fetch Customer Timeline from MongoDB (§5.2)
@@ -1375,6 +1410,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         unlinkCustomer,
         toggleOptOut,
         addTimelineNote,
+        addTimelineEmail,
         fetchCustomerTimeline,
         addOpportunity,
         updateOpportunityStage,

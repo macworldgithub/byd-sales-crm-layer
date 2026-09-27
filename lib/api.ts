@@ -141,6 +141,14 @@ export const customerApi = {
       method: 'DELETE',
       body: JSON.stringify({ reason }),
     }),
+  addTimelineEmail: (
+    customerId: string,
+    email: { author?: string; subject: string; body: string; to?: string; direction?: string }
+  ) =>
+    fetchApi<TimelineEvent>(`/crm/customers/${customerId}/emails`, {
+      method: 'POST',
+      body: JSON.stringify(email),
+    }),
   exportCustomersCsvUrl: (params?: Record<string, string | number | boolean | undefined>) =>
     `${getBaseUrl()}/crm/customers/export-csv${buildQueryString(params)}`,
   getPrivacyExport: (customerId: string) =>

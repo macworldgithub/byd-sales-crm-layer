@@ -440,6 +440,21 @@ export function Header({ onSelectCustomer, onOpenQuickDeal, onToggleMobileMenu }
                   )}
                 </button>
               ))}
+              <div className="pt-1 mt-1 border-t border-slate-100">
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      localStorage.removeItem('byd_crm_token');
+                      localStorage.removeItem('byd_crm_auth');
+                      window.location.reload();
+                    }
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center justify-between"
+                >
+                  <span>Sign Out</span>
+                  <span className="text-[10px] font-mono">Desk Lock</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

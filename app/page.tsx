@@ -26,6 +26,8 @@ import { MergeCustomerModal } from '@/components/modals/MergeCustomerModal';
 import { ToastContainer } from '@/components/ui/Toast';
 import { useCrm } from '@/lib/crmContext';
 import { Customer, Opportunity } from '@/lib/types';
+import { LoginView } from '@/components/auth/LoginView';
+import { getToken } from '@/lib/api';
 import {
   LayoutDashboard,
   GitBranch,
@@ -35,7 +37,15 @@ import {
 } from 'lucide-react';
 
 export default function SalesCrmApp() {
-  const { toasts, removeToast, allocations, opportunities } = useCrm();
+  const { toasts, removeToast, allocations, opportunities, customers } = useCrm();
+
+  // Auth gate state (§8.1)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return Boolean(getToken() || localStorage.getItem('byd_crm_auth') === 'true');
+    }
+    return true; // Default during SSR
+  });
 
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<string>('home');
@@ -52,6 +62,41 @@ export default function SalesCrmApp() {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isBookDriveOpen, setIsBookDriveOpen] = useState(false);
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
+
+  // Deep Link handler from Delivery Centre or Lead Centre (?customer_id=... or ?search=...)
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const customerIdParam = params.get('customer_id');
+    const searchParam = params.get('search');
+    const oppIdParam = params.get('opportunity_id');
+
+    if (customerIdParam) {
+      const match = customers.find((c) => c.customer_id === customerIdParam);
+      if (match) setSelected360Customer(match);
+    } else if (searchParam) {
+      const q = searchParam.toLowerCase().trim();
+      const match = customers.find(
+        (c) =>
+          c.phone?.includes(q) ||
+          c.name?.toLowerCase().includes(q) ||
+          c.email?.toLowerCase().includes(q)
+      );
+      if (match) setSelected360Customer(match);
+    }
+
+    if (oppIdParam) {
+      const matchOpp = opportunities.find((o) => o.opportunity_id === oppIdParam);
+      if (matchOpp) {
+        const custMatch = customers.find((c) => c.customer_id === matchOpp.customer_id);
+        if (custMatch) setSelected360Customer(custMatch);
+      }
+    }
+  }, [customers, opportunities]);
+
+  if (!isAuthenticated) {
+    return <LoginView onSuccess={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className="flex min-h-screen bg-[#f4f5f7] overflow-x-hidden">

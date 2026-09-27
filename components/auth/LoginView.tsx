@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Shield, Lock, Mail, ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
 import { useCrm } from '@/lib/crmContext';
-import { authApi } from '@/lib/api';
+import { authApi, setToken } from '@/lib/api';
 
 interface LoginViewProps {
   onSuccess?: () => void;
@@ -24,6 +24,13 @@ export function LoginView({ onSuccess }: LoginViewProps) {
     try {
       const res = await authApi.login({ email, password });
       if (res.success && res.data) {
+        const tokenVal = res.data.access_token || (res.data as any).token;
+        if (tokenVal) {
+          setToken(tokenVal);
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('byd_crm_auth', 'true');
+        }
         const u = res.data.user;
         setCurrentUser({
           id: u.id || u._id || 'usr-001',
