@@ -1019,7 +1019,7 @@ export const INITIAL_AUDIT_LOG: AuditLogEntry[] = [
   },
   {
     audit_id: 'AUD-8802',
-    actor: 'Lead Centre Webhook',
+    actor: 'Lead Centre Direct API',
     action: 'Lead Intake & SLA Created',
     target_type: 'Customer',
     target_id: 'CUST-0894',

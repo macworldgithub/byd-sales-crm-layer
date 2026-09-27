@@ -248,7 +248,7 @@ export function SettingsView() {
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="font-semibold text-slate-800">Lead Centre Webhook Pipeline</span>
+                <span className="font-semibold text-slate-800">Lead Centre Direct Database & API Pipeline</span>
               </div>
               <span className="text-[11px] font-mono text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded">Active / Ingesting</span>
             </div>
