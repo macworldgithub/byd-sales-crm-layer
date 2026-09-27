@@ -68,6 +68,7 @@ interface CrmContextType {
   allocationsPagination?: PaginationMeta;
   salesLogPagination?: PaginationMeta;
   deliveryWatchPagination?: PaginationMeta;
+  appointmentsPagination?: PaginationMeta;
 
   // Pagination Fetch Triggers
   fetchVyStock: (params?: Record<string, any>) => Promise<void>;
@@ -76,6 +77,7 @@ interface CrmContextType {
   fetchAllocations: (params?: Record<string, any>) => Promise<void>;
   fetchSalesLog: (params?: Record<string, any>) => Promise<void>;
   fetchDeliveryWatch: (params?: Record<string, any>) => Promise<void>;
+  fetchAppointments: (params?: Record<string, any>) => Promise<void>;
 
   // Actions: Customer & 360
   addCustomer: (data: Partial<Customer>) => Promise<Customer>;
@@ -179,6 +181,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   const [allocationsPagination, setAllocationsPagination] = useState<PaginationMeta | undefined>();
   const [salesLogPagination, setSalesLogPagination] = useState<PaginationMeta | undefined>();
   const [deliveryWatchPagination, setDeliveryWatchPagination] = useState<PaginationMeta | undefined>();
+  const [appointmentsPagination, setAppointmentsPagination] = useState<PaginationMeta | undefined>();
 
   // Fetch functions with pagination parameters
   const fetchVyStock = useCallback(async (params: Record<string, any> = {}) => {
@@ -256,7 +259,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   const fetchAppointments = useCallback(async (params: Record<string, any> = {}) => {
     try {
       const res = await appointmentApi.getAppointments(params);
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         const mapped: Appointment[] = res.data.map((a: any) => ({
           appointment_id: a.appointment_id || a.appointmentId || a.id || `APT-${a._id}`,
           customer_id: a.customer_id || a.leadId || '',
@@ -273,6 +276,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
           notes: a.notes || '',
         }));
         setAppointments(mapped);
+        if (res.pagination) setAppointmentsPagination(res.pagination);
       }
     } catch (err) {
       console.warn('fetchAppointments error:', err);
@@ -1467,12 +1471,14 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         allocationsPagination,
         salesLogPagination,
         deliveryWatchPagination,
+        appointmentsPagination,
         fetchVyStock,
         fetchCustomers,
         fetchOpportunities,
         fetchAllocations,
         fetchSalesLog,
         fetchDeliveryWatch,
+        fetchAppointments,
 
         addCustomer,
         updateCustomer,
