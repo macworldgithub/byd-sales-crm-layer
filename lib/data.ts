@@ -22,13 +22,13 @@ export const ASSET_PATHS = {
 };
 
 export const CURRENT_USER: UserProfile = {
-  id: 'usr-001',
-  name: 'Alex Rivers',
-  email: 'alex.rivers@harmonyauto.com.au',
-  role: 'consultant',
-  site: 'Fairfield',
-  team: 'Fairfield Metro Sales',
-  avatarInitials: 'AR',
+  id: 'usr-006',
+  name: 'Shaun Sumaru',
+  email: 'shaun@omnisuiteai.com',
+  role: 'super_admin',
+  site: 'All Sites',
+  team: 'Harmony Executive',
+  avatarInitials: 'SS',
 };
 
 export const ALL_USERS: UserProfile[] = [

@@ -61,27 +61,9 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
     return () => clearTimeout(timer);
   }, [handleFetch]);
 
-  // Client-side fallback filtering
-  const filteredAppointments = appointments.filter((a) => {
-    if (statusFilter !== 'All' && a.status !== statusFilter) return false;
-    if (locationFilter !== 'All Locations') {
-      const loc = locationFilter.toLowerCase();
-      const matchSite = (a.site || '').toLowerCase().includes(loc.replace('byd ', ''));
-      const matchNotes = (a.notes || '').toLowerCase().includes(loc);
-      if (!matchSite && !matchNotes) return false;
-    }
-    if (searchFilter.trim()) {
-      const q = searchFilter.toLowerCase();
-      const matchCustomer = a.customer_name.toLowerCase().includes(q);
-      const matchVehicle = a.vehicle.toLowerCase().includes(q);
-      const matchPhone = (a.phone || '').includes(q);
-      if (!matchCustomer && !matchVehicle && !matchPhone) return false;
-    }
-    return true;
-  });
-
-  const totalPages = appointmentsPagination?.pages || Math.ceil(filteredAppointments.length / pageSize) || 1;
-  const totalCount = appointmentsPagination?.total || filteredAppointments.length;
+  const displayAppointments = appointments;
+  const totalCount = appointmentsPagination?.total ?? displayAppointments.length;
+  const totalPages = Math.max(1, appointmentsPagination?.pages ?? Math.ceil(totalCount / pageSize));
 
   return (
     <div className="view-stack">
@@ -133,7 +115,7 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
                 setLocationFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full sm:w-auto text-xs p-2 pr-7 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+              className="w-full sm:w-auto text-xs p-2 pr-7 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
             >
               {LOCATION_OPTIONS.map((loc) => (
                 <option key={loc} value={loc}>
@@ -150,7 +132,7 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full sm:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            className="w-full sm:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
           >
             <option value="All">All Statuses</option>
             <option value="Confirmed">Confirmed</option>
@@ -166,13 +148,13 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
       </div>
 
       {/* Appointments List Grid */}
-      {filteredAppointments.length === 0 ? (
+      {displayAppointments.length === 0 ? (
         <div className="p-12 text-center text-slate-400 text-sm bg-white rounded-2xl border border-slate-200/80">
           No matching appointments found for the selected location and criteria.
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
-          {filteredAppointments.map((appt) => (
+          {displayAppointments.map((appt) => (
             <div
               key={appt.appointment_id}
               className="surface-card p-5 space-y-3 hover:shadow-lg transition-all"
@@ -258,8 +240,8 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 disabled:opacity-40 hover:bg-slate-100 flex items-center gap-1 text-slate-700 font-medium"
+            disabled={currentPage <= 1}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 flex items-center gap-1 text-slate-700 font-medium"
           >
             <ChevronLeft className="w-4 h-4" /> Previous
           </button>
@@ -268,8 +250,8 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
           </span>
           <button
             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage >= totalPages}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 disabled:opacity-40 hover:bg-slate-100 flex items-center gap-1 text-slate-700 font-medium"
+            disabled={currentPage >= totalPages || displayAppointments.length === 0}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 flex items-center gap-1 text-slate-700 font-medium"
           >
             Next <ChevronRight className="w-4 h-4" />
           </button>

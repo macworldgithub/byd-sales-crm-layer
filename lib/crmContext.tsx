@@ -152,8 +152,8 @@ const CrmContext = createContext<CrmContextType | undefined>(undefined);
 export function CrmProvider({ children }: { children: ReactNode }) {
   // Session & Tenancy
   const [currentUser, setCurrentUser] = useState<UserProfile>(CURRENT_USER);
-  const [selectedSite, setSelectedSite] = useState<SiteLocation>('Fairfield');
-  const [currentRole, setCurrentRole] = useState<UserRole>('consultant');
+  const [selectedSite, setSelectedSite] = useState<SiteLocation>('All Sites');
+  const [currentRole, setCurrentRole] = useState<UserRole>('super_admin');
   const [isOnline, setIsOnline] = useState(true);
 
   // Core Data
