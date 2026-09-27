@@ -13,7 +13,7 @@ import {
   SalesLogEntry,
   DeliveryHandoverWatch,
   PaginationMeta,
-  PaginatedResponse,
+  CustomerDocument,
 } from './types';
 
 // Dynamic production URL resolution for Vercel deployments
@@ -158,6 +158,17 @@ export const customerApi = {
       method: 'POST',
       body: JSON.stringify({ reason }),
     }),
+  getDocuments: (customerId: string) =>
+    fetchApi<CustomerDocument[]>(`/crm/customers/${customerId}/documents`),
+  addDocument: (customerId: string, doc: Partial<CustomerDocument>) =>
+    fetchApi<CustomerDocument>(`/crm/customers/${customerId}/documents`, {
+      method: 'POST',
+      body: JSON.stringify(doc),
+    }),
+  deleteDocument: (customerId: string, docId: string) =>
+    fetchApi<{ success: boolean }>(`/crm/customers/${customerId}/documents/${docId}`, {
+      method: 'DELETE',
+    }),
 };
 
 // ─── CRM Opportunities API ─────────────────────────────────────────────────
@@ -171,6 +182,11 @@ export const opportunityApi = {
     fetchApi<Opportunity>(`/crm/opportunities/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    }),
+  requestDeliveryDateChange: (id: string, requestedDate: string, reason: string) =>
+    fetchApi<{ success: boolean; message: string }>(`/crm/opportunities/${id}/request-delivery-date`, {
+      method: 'POST',
+      body: JSON.stringify({ requestedDate, reason }),
     }),
   exportOpportunitiesCsvUrl: (params?: Record<string, string | number | boolean | undefined>) =>
     `${getBaseUrl()}/crm/opportunities/export-csv${buildQueryString(params)}`,

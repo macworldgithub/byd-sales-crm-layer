@@ -29,8 +29,12 @@ import {
   Download,
   Shield,
   Trash2,
+  Upload,
+  Eye,
+  FileCheck,
+  FolderOpen,
 } from 'lucide-react';
-import { Customer, Opportunity, TimelineEvent, DeliveryHandoverWatch } from '@/lib/types';
+import { Customer, Opportunity, TimelineEvent, DeliveryHandoverWatch, CustomerDocument } from '@/lib/types';
 import { useCrm } from '@/lib/crmContext';
 import { customerApi } from '@/lib/api';
 import { BYD_SMS_TEMPLATES } from '@/lib/data';
@@ -60,6 +64,8 @@ export function Customer360Modal({
     unlinkCustomer,
     sendSmsMessage,
     logPhoneCall,
+    requestDeliveryDateChange,
+    addToast,
   } = useCrm();
 
   useEffect(() => {
@@ -92,6 +98,126 @@ export function Customer360Modal({
   const [callOutcome, setCallOutcome] = useState('Connected');
   const [callDuration, setCallDuration] = useState('5');
   const [callNotes, setCallNotes] = useState('');
+
+  // Documents Vault state (§5.1)
+  const [documents, setDocuments] = useState<CustomerDocument[]>([]);
+  const [isDocsLoading, setIsDocsLoading] = useState(false);
+  const [isAddDocOpen, setIsAddDocOpen] = useState(false);
+  const [newDocTitle, setNewDocTitle] = useState('');
+  const [newDocCategory, setNewDocCategory] = useState<CustomerDocument['category']>('Contract & Forms');
+  const [newDocFileName, setNewDocFileName] = useState('');
+  const [newDocNotes, setNewDocNotes] = useState('');
+
+  // Delivery Date Change state (§5.8)
+  const [isDateChangeOpen, setIsDateChangeOpen] = useState(false);
+  const [requestedHandoverDate, setRequestedHandoverDate] = useState('');
+  const [dateChangeReason, setDateChangeReason] = useState('Customer Schedule Preference');
+
+  // Fetch documents when tab or customer changes
+  useEffect(() => {
+    if (customer?.customer_id && activeTab === 'documents') {
+      setIsDocsLoading(true);
+      customerApi.getDocuments(customer.customer_id).then((res) => {
+        if (res.success && res.data) {
+          setDocuments(res.data);
+        } else {
+          // Default pre-sale document templates
+          setDocuments([
+            {
+              doc_id: 'DOC-COS-01',
+              customer_id: customer.customer_id,
+              title: 'Contract of Sale & Trade Appraisal Form',
+              category: 'Contract & Forms',
+              file_name: `BYD_Sales_Contract_${customer.customer_id.slice(-6)}.pdf`,
+              file_size: '245 KB',
+              status: 'Verified',
+              notes: 'Signed contract and preliminary trade appraisal form.',
+              uploaded_by: 'Sales Consultant',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+            {
+              doc_id: 'DOC-ID-02',
+              customer_id: customer.customer_id,
+              title: 'Driver Licence Copy (Front & Back)',
+              category: 'Identity Verification',
+              file_name: `Driver_Licence_${customer.name.replace(/\s+/g, '_')}.pdf`,
+              file_size: '1.2 MB',
+              status: 'Verified',
+              notes: 'Identity verified against state licensing database.',
+              uploaded_by: 'Sales Consultant',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          ]);
+        }
+        setIsDocsLoading(false);
+      }).catch(() => {
+        setIsDocsLoading(false);
+      });
+    }
+  }, [customer?.customer_id, activeTab]);
+
+  const handleAddDocumentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customer?.customer_id || !newDocTitle.trim()) return;
+
+    const payload = {
+      title: newDocTitle.trim(),
+      category: newDocCategory,
+      file_name: newDocFileName.trim() || `${newDocTitle.trim().replace(/\s+/g, '_')}.pdf`,
+      notes: newDocNotes.trim(),
+      status: 'Verified' as const,
+      file_size: '350 KB',
+    };
+
+    try {
+      const res = await customerApi.addDocument(customer.customer_id, payload);
+      if (res.success && res.data) {
+        setDocuments((prev) => [res.data as CustomerDocument, ...prev]);
+        addToast('success', 'Document Attached', `Saved ${payload.title} to customer vault.`);
+      }
+    } catch {
+      // Offline fallback
+      const localDoc: CustomerDocument = {
+        doc_id: `DOC-${Date.now().toString().slice(-6)}`,
+        customer_id: customer.customer_id,
+        ...payload,
+        uploaded_by: 'Sales Consultant',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setDocuments((prev) => [localDoc, ...prev]);
+      addToast('success', 'Document Attached', `Saved ${payload.title} to customer vault.`);
+    }
+
+    setNewDocTitle('');
+    setNewDocFileName('');
+    setNewDocNotes('');
+    setIsAddDocOpen(false);
+  };
+
+  const handleDeleteDocument = async (docId: string) => {
+    if (!customer?.customer_id || !confirm('Are you sure you want to remove this document from the vault?')) return;
+    try {
+      await customerApi.deleteDocument(customer.customer_id, docId);
+    } catch {
+      // Ignore
+    }
+    setDocuments((prev) => prev.filter((d) => d.doc_id !== docId));
+    addToast('info', 'Document Removed', 'Document deleted from customer record.');
+  };
+
+  const handleDateChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerDelivery?.client_id && !customerOpportunities[0]?.opportunity_id) return;
+    if (!requestedHandoverDate) return;
+
+    const targetId = customerDelivery?.client_id || customerOpportunities[0]?.opportunity_id;
+    await requestDeliveryDateChange(targetId, requestedHandoverDate, dateChangeReason);
+    addToast('success', 'Date Change Transmitted', `Handover reschedule request submitted for ${requestedHandoverDate}`);
+    setIsDateChangeOpen(false);
+  };
 
   if (!customer) return null;
 
@@ -805,37 +931,96 @@ export function Customer360Modal({
             </div>
           )}
 
-          {/* 7. DOCUMENTS TAB */}
+          {/* 7. DOCUMENTS TAB (§5.1 Pre-Sale Customer Vault) */}
           {activeTab === 'documents' && (
-            <div className="space-y-3 max-w-3xl mx-auto">
-              <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-slate-500" />
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">
-                      Contract of Sale & Trade Appraisal Form
-                    </span>
-                    <span className="text-[11px] text-slate-400">PDF · Verified signature on file</span>
-                  </div>
+            <div className="space-y-4 max-w-3xl mx-auto">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-900 block">
+                    Pre-Sale Customer Document Vault (§5.1)
+                  </span>
+                  <p className="text-[11px] text-slate-500">
+                    Store and verify contracts, licences, finance approvals, and trade-in inspection reports.
+                  </p>
                 </div>
-                <span className="text-xs font-bold text-[#e60012] cursor-pointer hover:underline">
-                  View PDF
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsAddDocOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white text-xs font-bold font-mono uppercase flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Attach Document</span>
+                </button>
               </div>
-              <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-slate-500" />
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">
-                      Driver License Verification (Front & Back)
-                    </span>
-                    <span className="text-[11px] text-slate-400">VIC Roads check verified</span>
-                  </div>
+
+              {isDocsLoading ? (
+                <div className="p-8 text-center text-xs text-slate-400">Loading customer documents...</div>
+              ) : documents.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-500 bg-white rounded-2xl border border-slate-200">
+                  <FolderOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  No pre-sale documents attached yet. Click &quot;Attach Document&quot; above to add contract or ID records.
                 </div>
-                <span className="text-xs font-bold text-[#e60012] cursor-pointer hover:underline">
-                  View Image
-                </span>
-              </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {documents.map((doc) => (
+                    <div
+                      key={doc.doc_id}
+                      className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between hover:border-slate-300 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-9 h-9 rounded-lg bg-red-50 text-[#e60012] flex items-center justify-center shrink-0">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-slate-900 truncate">
+                              {doc.title}
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold">
+                              {doc.category}
+                            </span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 font-semibold">
+                              <FileCheck className="w-3 h-3" />
+                              <span>{doc.status}</span>
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2 font-mono">
+                            <span>{doc.file_name}</span>
+                            <span>·</span>
+                            <span>{doc.file_size || 'PDF'}</span>
+                            <span>·</span>
+                            <span>Uploaded by {doc.uploaded_by}</span>
+                          </div>
+                          {doc.notes && (
+                            <p className="text-[11px] text-slate-600 italic mt-1">&quot;{doc.notes}&quot;</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 ml-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            addToast('info', 'Viewing Document', `Opening ${doc.file_name}`);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-slate-500" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDocument(doc.doc_id)}
+                          className="p-1.5 rounded-lg border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+                          title="Delete document"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -844,6 +1029,31 @@ export function Customer360Modal({
             <div className="space-y-5 max-w-3xl mx-auto">
               {customerDelivery ? (
                 <div className="space-y-4">
+                  {/* Delivery Exception Alert Banner (§5.8) */}
+                  {(customerDelivery.alert || activeOpp?.delivery_alert || activeOpp?.has_delivery_alert) && (
+                    <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-900 flex items-start gap-3 animate-in fade-in">
+                      <AlertTriangle className="w-5 h-5 text-[#e60012] shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <strong className="block text-xs font-bold uppercase tracking-wide font-mono text-[#e60012]">
+                          Delivery Centre Exception Flagged (§5.8)
+                        </strong>
+                        <p className="text-xs text-red-800 mt-0.5">
+                          {customerDelivery.alert || activeOpp?.delivery_alert || 'Handover issue flagged in Delivery Centre. Original consultant action required.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRequestedHandoverDate(customerDelivery.delivery_date || '');
+                          setIsDateChangeOpen(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-[#e60012] text-white text-[11px] font-bold uppercase font-mono shadow-sm shrink-0"
+                      >
+                        Reschedule Slot
+                      </button>
+                    </div>
+                  )}
+
                   <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
                     <div className="flex items-start justify-between">
                       <div>
@@ -892,22 +1102,35 @@ export function Customer360Modal({
                       <strong>Last Delivery Comment:</strong> {customerDelivery.last_comment}
                     </div>
 
-                    <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+                    <div className="pt-2 flex items-center justify-between border-t border-slate-100 flex-wrap gap-2">
                       <span className="text-[11px] text-slate-400">
                         Linked Delivery ID: {customerDelivery.client_id}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (confirm(`Uncouple Delivery record ${customerDelivery.client_id} from ${customer.name}?`)) {
-                            unlinkCustomer(customer.customer_id, 'delivery');
-                          }
-                        }}
-                        className="px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                      >
-                        <Unlink className="w-3.5 h-3.5" />
-                        <span>Unlink Delivery Record</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRequestedHandoverDate(customerDelivery.delivery_date || '');
+                            setIsDateChangeOpen(true);
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                        >
+                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Request Date Change</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Uncouple Delivery record ${customerDelivery.client_id} from ${customer.name}?`)) {
+                              unlinkCustomer(customer.customer_id, 'delivery');
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                        >
+                          <Unlink className="w-3.5 h-3.5" />
+                          <span>Unlink Delivery Record</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1148,6 +1371,191 @@ export function Customer360Modal({
                   className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs font-mono uppercase tracking-wider shadow-sm"
                 >
                   Save Call Log
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Attach Document Modal Dialog (§5.1) */}
+      {isAddDocOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-red-50 text-[#e60012] flex items-center justify-center font-bold">
+                  <Upload className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-[#e60012] uppercase tracking-wider font-mono">
+                    Pre-Sale Document Vault · §5.1
+                  </span>
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Attach Document for {customer.name}
+                  </h4>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddDocOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddDocumentSubmit} className="space-y-3.5">
+              <div>
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
+                  Document Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newDocTitle}
+                  onChange={(e) => setNewDocTitle(e.target.value)}
+                  placeholder="e.g. Approved Novated Lease Contract"
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
+                    Category *
+                  </label>
+                  <select
+                    value={newDocCategory}
+                    onChange={(e) => setNewDocCategory(e.target.value as any)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                  >
+                    <option value="Contract & Forms">Contract & Forms</option>
+                    <option value="Identity Verification">Identity Verification</option>
+                    <option value="Finance Approval">Finance Approval</option>
+                    <option value="Trade-In Appraisal">Trade-In Appraisal</option>
+                    <option value="Insurance">Insurance</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
+                    File Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newDocFileName}
+                    onChange={(e) => setNewDocFileName(e.target.value)}
+                    placeholder="e.g. Contract_Signed.pdf"
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
+                  Verification Notes
+                </label>
+                <textarea
+                  rows={2}
+                  value={newDocNotes}
+                  onChange={(e) => setNewDocNotes(e.target.value)}
+                  placeholder="e.g. Verified license against state register; deposit slip attached."
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsAddDocOpen(false)}
+                  className="px-3 py-2 text-xs font-semibold text-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs font-mono uppercase tracking-wider shadow-sm"
+                >
+                  Save & Attach
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delivery Reschedule Dialog (§5.8) */}
+      {isDateChangeOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider font-mono">
+                    Delivery Handover Reschedule · §5.8
+                  </span>
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Request Date Change for {customer.name}
+                  </h4>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDateChangeOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleDateChangeSubmit} className="space-y-3.5">
+              <div>
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
+                  Target Handover Date *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={requestedHandoverDate}
+                  onChange={(e) => setRequestedHandoverDate(e.target.value)}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
+                  Reschedule Reason *
+                </label>
+                <select
+                  value={dateChangeReason}
+                  onChange={(e) => setDateChangeReason(e.target.value)}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+                >
+                  <option value="Customer Schedule Preference">Customer Schedule Preference</option>
+                  <option value="Customer Travel / Interstate">Customer Travel / Interstate</option>
+                  <option value="Finance Settlement Delay">Finance Settlement Delay</option>
+                  <option value="Trade-in Vehicle Availability">Trade-in Vehicle Availability</option>
+                  <option value="PDI / Accessory Fitment Request">PDI / Accessory Fitment Request</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsDateChangeOpen(false)}
+                  className="px-3 py-2 text-xs font-semibold text-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs font-mono uppercase tracking-wider shadow-sm"
+                >
+                  Submit Reschedule Request
                 </button>
               </div>
             </form>

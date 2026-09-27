@@ -115,6 +115,11 @@ export interface Opportunity {
   lost_notes?: string;
   competitor_notes?: string;
   delivery_sync_pending?: boolean;
+  has_delivery_alert?: boolean;
+  delivery_alert?: string;
+  delivery_exception_type?: string;
+  delivery_date_requested?: string;
+  delivery_date_change_reason?: string;
   sync_status: 'synced' | 'vy_pending' | 'delivery_pending' | 'failed' | 'pending';
   created_at: string;
   updated_at: string;
@@ -373,16 +378,20 @@ export interface PaginationMeta {
   hasPrevPage?: boolean;
 }
 
-export interface PaginatedResponse<T> {
-  success: boolean;
-  data?: T;
-  count?: number;
-  total?: number;
-  page?: number;
-  limit?: number;
-  totalPages?: number;
-  pagination?: PaginationMeta;
-  message?: string;
+export interface CustomerDocument {
+  doc_id: string;
+  customer_id: string;
+  title: string;
+  category: 'Contract & Forms' | 'Identity Verification' | 'Finance Approval' | 'Trade-In Appraisal' | 'Insurance' | 'Other';
+  file_name: string;
+  file_type?: string;
+  file_size?: string;
+  file_url?: string;
+  status: 'Verified' | 'Pending Review' | 'Rejected' | 'Draft';
+  notes?: string;
+  uploaded_by: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 
