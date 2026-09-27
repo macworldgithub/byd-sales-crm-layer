@@ -26,9 +26,13 @@ import {
   ChevronRight,
   Plus,
   Unlink,
+  Download,
+  Shield,
+  Trash2,
 } from 'lucide-react';
 import { Customer, Opportunity, TimelineEvent, DeliveryHandoverWatch } from '@/lib/types';
 import { useCrm } from '@/lib/crmContext';
+import { customerApi } from '@/lib/api';
 import { BYD_SMS_TEMPLATES } from '@/lib/data';
 
 interface Customer360ModalProps {
@@ -73,6 +77,7 @@ export function Customer360Modal({
     | 'notes'
     | 'documents'
     | 'delivery'
+    | 'privacy'
     | 'audit'
   >('timeline');
 
@@ -138,6 +143,7 @@ export function Customer360Modal({
     { id: 'notes', label: 'Internal Notes' },
     { id: 'documents', label: 'Documents' },
     { id: 'delivery', label: 'Delivery Handover', highlight: !!customerDelivery },
+    { id: 'privacy', label: 'Privacy & Retention' },
     { id: 'audit', label: 'Audit Log' },
   ];
 
@@ -913,7 +919,123 @@ export function Customer360Modal({
             </div>
           )}
 
-          {/* 9. AUDIT LOG TAB (§5.10 & AC-10) */}
+          {/* 9. PRIVACY & COMPLIANCE (APP 12/13) TAB (§5.10) */}
+          {activeTab === 'privacy' && (
+            <div className="space-y-4 max-w-3xl mx-auto">
+              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider font-mono flex items-center gap-1">
+                      <Shield className="w-3.5 h-3.5" />
+                      <span>Privacy Act 1988 (Cth) · Australian Privacy Principles</span>
+                    </span>
+                    <h4 className="text-base font-bold text-slate-900 mt-1">
+                      Customer Data Governance & Rights Management
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      Manage statutory access requests (APP 12), data portability, and retention erasure.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Consent & ACMA Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Marketing & SMS Consent</span>
+                    <strong className={customer.consent_sms ? 'text-emerald-700 font-semibold' : 'text-red-700 font-semibold'}>
+                      {customer.consent_sms ? 'Active Consent' : 'Opted-Out / Revoked'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Do Not Contact State</span>
+                    <strong className={customer.do_not_contact ? 'text-red-700 font-semibold' : 'text-emerald-700 font-semibold'}>
+                      {customer.do_not_contact ? 'BLOCKED (DNC Active)' : 'Clear to Contact'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Consent Updated</span>
+                    <strong className="text-slate-800 font-mono">
+                      {new Date(customer.consent_updated_at).toLocaleDateString('en-AU')}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* APP 12 Data Access Export */}
+                <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong className="text-xs font-bold text-slate-900 block">
+                        APP 12 — Individual Access Request Package
+                      </strong>
+                      <p className="text-[11px] text-slate-500">
+                        Export complete portable dossier (profile, timeline, SMS logs, test drives, deals, delivery history) as verified JSON.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await customerApi.getPrivacyExport(customer.customer_id);
+                          if (res.success && res.data) {
+                            const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(res.data, null, 2));
+                            const downloadAnchor = document.createElement('a');
+                            downloadAnchor.setAttribute('href', dataStr);
+                            downloadAnchor.setAttribute('download', `privacy-export-${customer.customer_id}.json`);
+                            document.body.appendChild(downloadAnchor);
+                            downloadAnchor.click();
+                            downloadAnchor.remove();
+                          } else {
+                            alert(res.message || 'Export failed');
+                          }
+                        } catch (err: any) {
+                          alert(err.message || 'Failed to generate privacy export');
+                        }
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download APP Dossier</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* APP Retention & Right-to-Erasure Anonymization */}
+                <div className="p-4 rounded-xl border border-red-200 bg-red-50/50 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong className="text-xs font-bold text-red-950 block">
+                        Right to Erasure / PII Anonymization
+                      </strong>
+                      <p className="text-[11px] text-red-800">
+                        Anonymize customer PII across Lead Centre, Sales CRM, and Delivery Centre while retaining financial units for regulatory audits.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const reason = prompt('Please specify reason for Privacy Act erasure/anonymization:', 'Customer requested under APP');
+                        if (reason) {
+                          const res = await customerApi.anonymizePrivacy(customer.customer_id, reason);
+                          if (res.success) {
+                            alert('Customer record successfully anonymized across all databases.');
+                            window.location.reload();
+                          } else {
+                            alert(res.message || 'Anonymization failed');
+                          }
+                        }
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Anonymize PII</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 10. AUDIT LOG TAB (§5.10 & AC-10) */}
           {activeTab === 'audit' && (
             <div className="space-y-3 max-w-3xl mx-auto">
               <span className="text-xs font-bold text-slate-900 block mb-2 font-mono uppercase tracking-wider">

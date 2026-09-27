@@ -40,6 +40,28 @@ export function SalesLogView() {
   });
 
   React.useEffect(() => {
+    import('@/lib/api').then(({ syncApi }) => {
+      syncApi.getFieldMapping().then((res) => {
+        if (res.success && res.data) {
+          setColumnMappings((prev) => ({
+            ...prev,
+            contractNo: res.data.deal_number || prev.contractNo,
+            contractDate: res.data.deal_date || prev.contractDate,
+            buyerName: res.data.customer_name || prev.buyerName,
+            vehicleDesc: res.data.vehicle || prev.vehicleDesc,
+            chassisVin: res.data.vin || prev.chassisVin,
+            stockRef: res.data.stock_id || prev.stockRef,
+            transType: res.data.sale_type || prev.transType,
+            repName: res.data.salesperson || prev.repName,
+            invoicedAud: res.data.amount || prev.invoicedAud,
+            grossMargin: res.data.gross || prev.grossMargin,
+          }));
+        }
+      });
+    });
+  }, []);
+
+  React.useEffect(() => {
     const timer = setTimeout(() => {
       fetchSalesLog({
         page: currentPage,
@@ -482,9 +504,15 @@ export function SalesLogView() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowMappingModal(false);
-                    addToast('success', 'Mapping Schema Saved', 'Harmony column mappings persisted for automated nightly reconcile.');
+                  onClick={async () => {
+                    try {
+                      const { syncApi } = await import('@/lib/api');
+                      await syncApi.saveFieldMapping(columnMappings);
+                      setShowMappingModal(false);
+                      addToast('success', 'Mapping Schema Saved', 'Harmony column mappings persisted to database for automated nightly reconcile.');
+                    } catch (err: any) {
+                      addToast('error', 'Save Failed', err.message || 'Could not save mapping schema.');
+                    }
                   }}
                   className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono uppercase tracking-wider"
                 >

@@ -143,6 +143,13 @@ export const customerApi = {
     }),
   exportCustomersCsvUrl: (params?: Record<string, string | number | boolean | undefined>) =>
     `${getBaseUrl()}/crm/customers/export-csv${buildQueryString(params)}`,
+  getPrivacyExport: (customerId: string) =>
+    fetchApi<any>(`/crm/customers/${customerId}/privacy-export`),
+  anonymizePrivacy: (customerId: string, reason?: string) =>
+    fetchApi<{ success: boolean; customerId: string }>(`/crm/customers/${customerId}/privacy-anonymize`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
 };
 
 // ─── CRM Opportunities API ─────────────────────────────────────────────────
@@ -226,6 +233,10 @@ export const vyApi = {
       method: 'POST',
       body: JSON.stringify({ stockId }),
     }),
+  checkExpiredHolds: () =>
+    fetchApi<{ success: boolean; releasedCount: number }>('/crm/vy/check-expired-holds', {
+      method: 'POST',
+    }),
 };
 
 // ─── Sales Log & Delivery Sync API ─────────────────────────────────────────
@@ -243,6 +254,25 @@ export const syncApi = {
     }),
   exportSalesLogCsvUrl: (params?: Record<string, string | number | boolean | undefined>) =>
     `${getBaseUrl()}/crm/saleslog/export-csv${buildQueryString(params)}`,
+  getExceptions: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchApi<any[]>(`/crm/saleslog/exceptions${buildQueryString(params)}`),
+  resolveException: (id: string, payload: any) =>
+    fetchApi<any>(`/crm/saleslog/exceptions/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  dismissException: (id: string, reason?: string) =>
+    fetchApi<any>(`/crm/saleslog/exceptions/${id}/dismiss`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  getFieldMapping: () =>
+    fetchApi<any>('/crm/settings/saleslog-mapping'),
+  saveFieldMapping: (mapping: any) =>
+    fetchApi<any>('/crm/settings/saleslog-mapping', {
+      method: 'POST',
+      body: JSON.stringify(mapping),
+    }),
   getDeliveryWatch: (params?: Record<string, string | number | boolean | undefined>) =>
     fetchApi<DeliveryHandoverWatch[]>(`/crm/delivery-watch${buildQueryString(params)}`),
   updateDeliveryNote: (clientId: string, note: string) =>
@@ -268,8 +298,32 @@ export const crmMessageApi = {
     }),
 };
 
+// ─── Real-Time Notifications API ───────────────────────────────────────────
+export const notificationApi = {
+  getNotifications: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchApi<any[]>(`/crm/notifications${buildQueryString(params)}`),
+};
+
 // ─── Desk Session Authentication API ───────────────────────────────────────
 export const authApi = {
+  login: async (credentials: { email: string; password: string }) => {
+    const res = await fetchApi<{ access_token: string; user: any; must_change_password?: boolean }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+    if (res.success && res.data?.access_token) {
+      setToken(res.data.access_token);
+    }
+    return res;
+  },
+  getMe: () => fetchApi<any>('/auth/me'),
+  logout: async () => {
+    try {
+      await fetchApi('/auth/logout', { method: 'POST' });
+    } finally {
+      clearToken();
+    }
+  },
   getDeskSession: async () => {
     const res = await fetchApi<{ access_token: string; user: any }>('/auth/crm-session');
     if (res.success && res.data?.access_token) {
@@ -277,6 +331,36 @@ export const authApi = {
     }
     return res;
   },
+};
+
+// ─── Appointments & Test Drives API ─────────────────────────────────────────
+export const appointmentApi = {
+  getAppointments: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchApi<any[]>(`/crm/appointments${buildQueryString(params)}`),
+  createAppointment: (payload: Record<string, any>) =>
+    fetchApi<any>('/crm/appointments', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateAppointment: (id: string, patch: Record<string, any>) =>
+    fetchApi<any>(`/crm/appointments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+};
+
+// ─── Inbound Exceptions & Sync Queue API ────────────────────────────────────
+export const inboundQueueApi = {
+  getSyncPending: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchApi<{
+      pendingCount: number;
+      pendingDeliveries: any[];
+      salesLogExceptions: any[];
+    }>(`/crm/sync-pending${buildQueryString(params)}`),
+  retryDeliverySync: (opportunityId: string) =>
+    fetchApi<any>(`/crm/sync-pending/${opportunityId}/retry`, {
+      method: 'POST',
+    }),
 };
 
 // ─── Dynamic Scoreboards & Targets API ───────────────────────────────────────
@@ -287,3 +371,4 @@ export const boardApi = {
   updateTarget: (payload: { period?: string; targetUnitCount: number; targetRevenue?: number }) =>
     fetchApi<any>('/crm/targets', { method: 'POST', body: JSON.stringify(payload) }),
 };
+

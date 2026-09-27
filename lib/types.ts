@@ -252,6 +252,7 @@ export interface DeliveryHandoverWatch {
 
 export interface Appointment {
   appointment_id: string;
+  lead_appointment_id?: string;
   customer_id: string;
   customer_name: string;
   phone: string;
@@ -289,6 +290,80 @@ export interface AuditLogEntry {
   timestamp: string;
 }
 
+export interface SalesLogException {
+  _id: string;
+  sales_log_id?: string;
+  deal_number: string;
+  customer_name: string;
+  phone: string;
+  vin: string;
+  stock_id: string;
+  vehicle: string;
+  site: SiteLocation;
+  salesperson: string;
+  sale_type: SaleType;
+  deal_date: string;
+  gross?: number;
+  exception_status: 'flagged' | 'conflict' | 'pending_review' | 'resolved' | 'dismissed';
+  exception_reason?: string;
+  exception_raised_at?: string;
+  exception_resolved_at?: string;
+  exception_resolved_by?: string;
+  resolution_notes?: string;
+  dismissal_reason?: string;
+}
+
+export interface SalesLogFieldMapping {
+  deal_number: string;
+  customer_name: string;
+  phone: string;
+  email: string;
+  site: string;
+  salesperson: string;
+  secondary_salesperson: string;
+  vehicle: string;
+  vin: string;
+  stock_id: string;
+  vy_order_id: string;
+  sale_type: string;
+  deal_date: string;
+  gross: string;
+  deposit: string;
+  finance_type: string;
+}
+
+export interface AppNotification {
+  id: string;
+  type: 'delivery_alert' | 'sla_escalation' | 'overdue_action';
+  severity: 'danger' | 'warning' | 'info';
+  title: string;
+  message: string;
+  customer_name?: string;
+  vehicle?: string;
+  site?: SiteLocation;
+  client_id?: string;
+  opportunity_id?: string;
+  allocation_id?: string;
+  timestamp: string;
+}
+
+export interface PrivacyExportData {
+  metadata: {
+    regulation: string;
+    exported_at: string;
+    exported_by: string;
+    customer_id: string;
+    legal_entity: string;
+  };
+  customer_profile: Customer;
+  opportunities: Opportunity[];
+  timeline_events: TimelineEvent[];
+  lead_centre_profile?: any;
+  appointments?: Appointment[];
+  sms_conversations?: any[];
+  delivery_centre_profile?: any;
+}
+
 export interface PaginationMeta {
   total: number;
   page: number;
@@ -309,4 +384,5 @@ export interface PaginatedResponse<T> {
   pagination?: PaginationMeta;
   message?: string;
 }
+
 

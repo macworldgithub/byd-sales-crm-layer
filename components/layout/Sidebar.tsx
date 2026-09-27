@@ -70,11 +70,13 @@ export function Sidebar({
   ];
 
   const managerNav = [
+    { id: 'inbound-queue', label: 'Inbound Queue', icon: Inbox },
     { id: 'team', label: 'Team & Targets', icon: BarChart3 },
     { id: 'reports', label: 'Reports & Exports', icon: FileSpreadsheet },
     { id: 'audit', label: 'Audit & ACMA', icon: ShieldCheck },
     { id: 'settings', label: 'CRM Settings', icon: Settings },
   ];
+
 
   const renderNavContent = (isMobile = false) => (
     <>
