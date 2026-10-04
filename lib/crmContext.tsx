@@ -40,6 +40,47 @@ export interface ToastMessage {
   description?: string;
 }
 
+export const ALL_SITES_AND_YARDS: SiteLocation[] = [
+  'All Sites',
+  'BYD Melbourne City',
+  'BYD Caroline Springs',
+  'BYD Nunawading',
+  'BYD Fairfield',
+  'Denza Melbourne',
+  'Holding Yard VIC',
+  'BYD Doncaster',
+];
+
+export function matchesSite(recordSiteOrYard?: string | null, targetSite?: string | null): boolean {
+  if (
+    !targetSite ||
+    targetSite === 'All Sites' ||
+    targetSite === 'All Locations' ||
+    targetSite === 'All Sites & Yards' ||
+    targetSite === 'All Yards' ||
+    targetSite === 'All Departments' ||
+    targetSite === 'All'
+  ) {
+    return true;
+  }
+  if (!recordSiteOrYard) return false;
+
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/^byd\s+/i, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+
+  const cleanTarget = normalize(targetSite);
+  const cleanRecord = normalize(recordSiteOrYard);
+
+  if (cleanTarget === cleanRecord) return true;
+  if (cleanRecord.includes(cleanTarget) || cleanTarget.includes(cleanRecord)) return true;
+  return false;
+}
+
+
 interface CrmContextType {
   // Current Session & Tenancy
   currentUser: UserProfile;
@@ -152,9 +193,27 @@ const CrmContext = createContext<CrmContextType | undefined>(undefined);
 export function CrmProvider({ children }: { children: ReactNode }) {
   // Session & Tenancy
   const [currentUser, setCurrentUser] = useState<UserProfile>(CURRENT_USER);
-  const [selectedSite, setSelectedSite] = useState<SiteLocation>('All Sites');
+  const [selectedSite, setSelectedSiteState] = useState<SiteLocation>('All Sites');
   const [currentRole, setCurrentRole] = useState<UserRole>('super_admin');
   const [isOnline, setIsOnline] = useState(true);
+
+  // Load saved yard/site from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('byd_crm_site');
+      if (saved) {
+        setSelectedSiteState(saved as SiteLocation);
+      }
+    }
+  }, []);
+
+  const setSelectedSite = useCallback((site: SiteLocation) => {
+    setSelectedSiteState(site);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('byd_crm_site', site);
+    }
+  }, []);
+
 
   // Core Data
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
@@ -359,17 +418,24 @@ export function CrmProvider({ children }: { children: ReactNode }) {
           await authApi.getDeskSession();
         } catch {}
       }
-      fetchCustomers({ page: 1, limit: 50 });
-      fetchOpportunities({ page: 1, limit: 50 });
-      fetchAllocations({ page: 1, limit: 50 });
-      fetchVyStock({ page: 1, limit: 20 });
-      fetchSalesLog({ page: 1, limit: 50 });
-      fetchDeliveryWatch({ page: 1, limit: 20 });
-      fetchAppointments({ limit: 50 });
       fetchScoreboards();
     };
     initSession();
-  }, [fetchCustomers, fetchOpportunities, fetchAllocations, fetchVyStock, fetchSalesLog, fetchDeliveryWatch, fetchAppointments, fetchScoreboards]);
+  }, [fetchScoreboards]);
+
+  // Synchronize collections whenever selectedSite / yard / department changes
+  useEffect(() => {
+    const siteParam = selectedSite !== 'All Sites' ? selectedSite : undefined;
+    const query = siteParam ? { site: siteParam, yard: siteParam, location: siteParam } : {};
+    fetchCustomers({ page: 1, limit: 50, ...query });
+    fetchOpportunities({ page: 1, limit: 50, ...query });
+    fetchAllocations({ page: 1, limit: 50, ...query });
+    fetchVyStock({ page: 1, limit: 20, ...query });
+    fetchSalesLog({ page: 1, limit: 50, ...query });
+    fetchDeliveryWatch({ page: 1, limit: 20, ...query });
+    fetchAppointments({ limit: 50, ...query });
+  }, [selectedSite, fetchCustomers, fetchOpportunities, fetchAllocations, fetchVyStock, fetchSalesLog, fetchDeliveryWatch, fetchAppointments]);
+
 
   // Add Customer with Live Database Duplicate Detection (§5.1 & AC-1)
   const addCustomer = async (data: Partial<Customer>): Promise<Customer> => {
@@ -1413,31 +1479,37 @@ export function CrmProvider({ children }: { children: ReactNode }) {
 
 
 
-  // Filtered lists based on tenancy (selectedSite)
-  const filteredCustomers =
-    selectedSite === 'All Sites'
-      ? customers
-      : customers.filter((c) => c.site === selectedSite);
+  // Filtered lists based on overall yard / department / site filter (selectedSite)
+  const filteredCustomers = customers.filter((c) =>
+    matchesSite(c.site || (c as any).location || (c as any).department, selectedSite)
+  );
 
-  const filteredOpportunities =
-    selectedSite === 'All Sites'
-      ? opportunities
-      : opportunities.filter((o) => o.site === selectedSite);
+  const filteredOpportunities = opportunities.filter((o) =>
+    matchesSite(o.site || (o as any).location || (o as any).department, selectedSite)
+  );
 
-  const filteredAllocations =
-    selectedSite === 'All Sites'
-      ? allocations
-      : allocations.filter((a) => a.site === selectedSite);
+  const filteredAllocations = allocations.filter((a) =>
+    matchesSite(a.site || a.yard || (a as any).dealer || a.department, selectedSite)
+  );
 
-  const filteredSalesLog =
-    selectedSite === 'All Sites'
-      ? salesLog
-      : salesLog.filter((s) => s.site === selectedSite);
+  const filteredSalesLog = salesLog.filter((s) =>
+    matchesSite(s.site || s.department || s.location || s.yard, selectedSite)
+  );
 
-  const filteredAppointments =
-    selectedSite === 'All Sites'
-      ? appointments
-      : appointments.filter((a) => a.site === selectedSite);
+  const filteredVyStock = vyStock.filter((v) =>
+    matchesSite(v.location || v.yard || v.site || v.department, selectedSite)
+  );
+
+  const filteredDeliveryWatch = deliveryWatch.filter((d) => {
+    const opp = opportunities.find((o) => o.opportunity_id === d.opportunity_id);
+    const directSite = d.site || d.yard || d.dealer || d.department || d.location;
+    const oppSite = opp?.site;
+    return matchesSite(directSite || oppSite, selectedSite);
+  });
+
+  const filteredAppointments = appointments.filter((a) =>
+    matchesSite(a.site || (a as any).loop || (a as any).location || (a as any).dealership, selectedSite)
+  );
 
   return (
     <CrmContext.Provider
@@ -1453,9 +1525,9 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         opportunities: filteredOpportunities,
         allocations: filteredAllocations,
         timelineEvents,
-        vyStock,
+        vyStock: filteredVyStock,
         salesLog: filteredSalesLog,
-        deliveryWatch,
+        deliveryWatch: filteredDeliveryWatch,
         appointments: filteredAppointments,
         auditLog,
 

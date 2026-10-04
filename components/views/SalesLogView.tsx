@@ -18,7 +18,7 @@ import { SalesLogEntry } from '@/lib/types';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 
 export function SalesLogView() {
-  const { salesLog, salesLogPagination, fetchSalesLog, reconcileSalesLogRow, addToast, selectedSite } = useCrm();
+  const { salesLog, salesLogPagination, fetchSalesLog, reconcileSalesLogRow, addToast, selectedSite, setSelectedSite } = useCrm();
 
   const [searchFilter, setSearchFilter] = useState('');
   const [reconciledFilter, setReconciledFilter] = useState('All');
@@ -69,6 +69,9 @@ export function SalesLogView() {
         q: searchFilter.trim() || undefined,
         reconciled: reconciledFilter === 'All' ? undefined : reconciledFilter === 'Reconciled',
         site: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        yard: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        location: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        department: selectedSite !== 'All Sites' ? selectedSite : undefined,
       });
     }, 250);
     return () => clearTimeout(timer);
@@ -177,6 +180,25 @@ export function SalesLogView() {
           </button>
         </div>
       </div>
+
+      {/* Active Yard Filter Notice */}
+      {selectedSite !== 'All Sites' && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs text-emerald-900 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+            <span>
+              Official Sales Log deals scoped to yard / site: <strong>{selectedSite}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => setSelectedSite('All Sites')}
+            className="text-[11px] font-semibold text-emerald-700 hover:underline"
+          >
+            Show All Sites
+          </button>
+        </div>
+      )}
+
 
       {/* Summary KPI Tiles */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">

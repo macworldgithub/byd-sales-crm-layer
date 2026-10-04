@@ -26,6 +26,8 @@ export function DeliveriesView() {
     fetchDeliveryWatch,
     addDeliveryHandoverNote,
     requestDeliveryDateChange,
+    selectedSite,
+    setSelectedSite,
     addToast,
   } = useCrm();
 
@@ -42,7 +44,7 @@ export function DeliveriesView() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Debounced server-side fetch on search, stage, page, or limit change
+  // Debounced server-side fetch on search, stage, page, site or limit change
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchDeliveryWatch({
@@ -50,10 +52,14 @@ export function DeliveriesView() {
         limit: pageSize,
         q: searchFilter.trim() || undefined,
         stage: stageFilter !== 'All' ? stageFilter : undefined,
+        site: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        yard: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        location: selectedSite !== 'All Sites' ? selectedSite : undefined,
       });
     }, 250);
     return () => clearTimeout(timer);
-  }, [currentPage, pageSize, searchFilter, stageFilter, fetchDeliveryWatch]);
+  }, [currentPage, pageSize, searchFilter, stageFilter, selectedSite, fetchDeliveryWatch]);
+
 
   const handleFilterChange = (type: 'search' | 'stage', val: string) => {
     setCurrentPage(1);
@@ -96,6 +102,25 @@ export function DeliveriesView() {
           </p>
         </div>
       </div>
+
+      {/* Active Yard Filter Notice */}
+      {selectedSite !== 'All Sites' && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-red-50/80 border border-red-200 text-xs text-red-900 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#e60012] animate-pulse" />
+            <span>
+              Deliveries & PDI Handovers scoped to yard / site: <strong>{selectedSite}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => setSelectedSite('All Sites')}
+            className="text-[11px] font-semibold text-[#e60012] hover:underline"
+          >
+            Show All Sites
+          </button>
+        </div>
+      )}
+
 
       {/* Filter Row */}
       <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

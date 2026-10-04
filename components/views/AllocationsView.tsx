@@ -34,6 +34,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
     customers,
     currentUser,
     selectedSite,
+    setSelectedSite,
     createAllocation,
     acceptAllocation,
     reassignAllocation,
@@ -130,6 +131,25 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
           </button>
         </div>
       </div>
+
+      {/* Active Yard Filter Notice */}
+      {selectedSite !== 'All Sites' && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-red-50/80 border border-red-200 text-xs text-red-900 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#e60012] animate-pulse" />
+            <span>
+              Inbound allocations scoped to yard / site: <strong>{selectedSite}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => setSelectedSite('All Sites')}
+            className="text-[11px] font-semibold text-[#e60012] hover:underline"
+          >
+            Show All Sites
+          </button>
+        </div>
+      )}
+
 
       {/* AC-11 Quarantine & Production Guard Banner */}
       <div className="p-3.5 rounded-xl bg-slate-900 text-white flex items-center justify-between text-xs shadow-sm flex-wrap gap-2">

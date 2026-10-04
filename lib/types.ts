@@ -4,7 +4,16 @@ export type SiteLocation =
   | 'Doncaster'
   | 'Nunawading'
   | 'Caroline Springs'
-  | 'All Sites';
+  | 'BYD Melbourne City'
+  | 'BYD Caroline Springs'
+  | 'BYD Nunawading'
+  | 'BYD Fairfield'
+  | 'BYD Doncaster'
+  | 'Denza Melbourne'
+  | 'Holding Yard VIC'
+  | 'All Sites'
+  | (string & {});
+
 
 export type UserRole =
   | 'consultant'
@@ -202,6 +211,9 @@ export interface VirtualYardStock {
   variant: string;
   colour: string;
   location: string;
+  yard?: string;
+  site?: string;
+  department?: string;
   status: 'Available' | 'Held' | 'Inbound' | 'Sold' | 'Withdrawn';
   held_by?: string;
   held_by_consultant?: string;
@@ -224,6 +236,9 @@ export interface SalesLogEntry {
   sale_type: SaleType;
   consultant: string;
   site: SiteLocation;
+  department?: string;
+  location?: string;
+  yard?: string;
   amount: number;
   gross?: number;
   reconciled: boolean;
@@ -253,6 +268,11 @@ export interface DeliveryHandoverWatch {
   arrived: boolean;
   last_comment: string;
   alert?: string;
+  site?: SiteLocation;
+  yard?: string;
+  dealer?: string;
+  department?: string;
+  location?: string;
 }
 
 export interface Appointment {

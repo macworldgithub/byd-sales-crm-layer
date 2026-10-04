@@ -37,6 +37,8 @@ export function InboundQueueView() {
     try {
       const res = await inboundQueueApi.getSyncPending({
         site: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        yard: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        location: selectedSite !== 'All Sites' ? selectedSite : undefined,
       });
       if (res.success && res.data) {
         setSyncData(res.data);

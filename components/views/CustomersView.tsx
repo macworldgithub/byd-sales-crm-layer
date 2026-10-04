@@ -30,7 +30,7 @@ export function CustomersView({
   onOpenAddCustomer,
   onOpenMergeModal,
 }: CustomersViewProps) {
-  const { customers, customersPagination, fetchCustomers, selectedSite } = useCrm();
+  const { customers, customersPagination, fetchCustomers, selectedSite, setSelectedSite } = useCrm();
 
   const [searchFilter, setSearchFilter] = useState('');
   const [recordTypeFilter, setRecordTypeFilter] = useState<string>('All');
@@ -45,10 +45,13 @@ export function CustomersView({
         q: searchFilter.trim() || undefined,
         record_type: recordTypeFilter !== 'All' ? recordTypeFilter : undefined,
         site: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        yard: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        location: selectedSite !== 'All Sites' ? selectedSite : undefined,
       });
     }, 250);
     return () => clearTimeout(timer);
   }, [currentPage, pageSize, searchFilter, recordTypeFilter, selectedSite, fetchCustomers]);
+
 
   const handleFilterChange = (type: 'search' | 'recordType', val: string) => {
     setCurrentPage(1);
@@ -88,6 +91,25 @@ export function CustomersView({
           </button>
         </div>
       </div>
+
+      {/* Active Yard Filter Notice */}
+      {selectedSite !== 'All Sites' && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-red-50/80 border border-red-200 text-xs text-red-900 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#e60012] animate-pulse" />
+            <span>
+              Customer 360 profiles scoped to yard / site: <strong>{selectedSite}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => setSelectedSite('All Sites')}
+            className="text-[11px] font-semibold text-[#e60012] hover:underline"
+          >
+            Show All Sites
+          </button>
+        </div>
+      )}
+
 
       {/* Filter Row */}
       <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

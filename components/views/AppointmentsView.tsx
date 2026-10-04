@@ -24,24 +24,33 @@ interface AppointmentsViewProps {
 
 const LOCATION_OPTIONS = [
   'All Locations',
-  'BYD Caroline Springs',
   'BYD Melbourne City',
-  'BYD Melbourne CBD',
+  'BYD Caroline Springs',
+  'BYD Nunawading',
   'BYD Fairfield',
-  'BYD South East',
+  'Denza Melbourne',
   'Holding Yard VIC',
-  'BYD Sydney',
-  'BYD Gold Coast',
+  'BYD Doncaster',
 ];
 
 export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
-  const { appointments, appointmentsPagination, fetchAppointments, selectedSite, addToast } = useCrm();
+  const { appointments, appointmentsPagination, fetchAppointments, selectedSite, setSelectedSite, addToast } = useCrm();
 
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [locationFilter, setLocationFilter] = useState('All Locations');
+  const [locationFilter, setLocationFilter] = useState(() => (selectedSite !== 'All Sites' ? selectedSite : 'All Locations'));
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
+
+  // Sync with global overall filter
+  useEffect(() => {
+    if (selectedSite && selectedSite !== 'All Sites') {
+      setLocationFilter(selectedSite);
+    } else {
+      setLocationFilter('All Locations');
+    }
+  }, [selectedSite]);
+
 
   // Trigger backend fetch on filter / page change
   const handleFetch = useCallback(() => {

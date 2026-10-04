@@ -20,7 +20,7 @@ import { StockHoldModal } from '@/components/modals/StockHoldModal';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 
 export function VirtualYardView() {
-  const { vyStock, vyStockPagination, fetchVyStock, releaseStock, addToast } = useCrm();
+  const { vyStock, vyStockPagination, fetchVyStock, releaseStock, selectedSite, setSelectedSite, addToast } = useCrm();
 
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -31,7 +31,7 @@ export function VirtualYardView() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
 
-  // Debounced server-side fetch on search, status, model, page or limit change
+  // Debounced server-side fetch on search, status, model, site, page or limit change
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchVyStock({
@@ -40,10 +40,13 @@ export function VirtualYardView() {
         q: searchFilter.trim() || undefined,
         status: statusFilter !== 'All' ? statusFilter : undefined,
         model: modelFilter !== 'All' ? modelFilter : undefined,
+        location: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        yard: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        site: selectedSite !== 'All Sites' ? selectedSite : undefined,
       });
     }, 250);
     return () => clearTimeout(timer);
-  }, [currentPage, pageSize, searchFilter, statusFilter, modelFilter, fetchVyStock]);
+  }, [currentPage, pageSize, searchFilter, statusFilter, modelFilter, selectedSite, fetchVyStock]);
 
   const handleRefreshFromVy = () => {
     setIsRefreshing(true);
@@ -53,6 +56,9 @@ export function VirtualYardView() {
       q: searchFilter.trim() || undefined,
       status: statusFilter !== 'All' ? statusFilter : undefined,
       model: modelFilter !== 'All' ? modelFilter : undefined,
+      location: selectedSite !== 'All Sites' ? selectedSite : undefined,
+      yard: selectedSite !== 'All Sites' ? selectedSite : undefined,
+      site: selectedSite !== 'All Sites' ? selectedSite : undefined,
     }).finally(() => {
       setTimeout(() => {
         setIsRefreshing(false);
@@ -60,6 +66,7 @@ export function VirtualYardView() {
       }, 400);
     });
   };
+
 
   const handleFilterChange = (type: 'search' | 'status' | 'model', val: string) => {
     setCurrentPage(1); // Reset to first page on filter change
@@ -96,6 +103,25 @@ export function VirtualYardView() {
           </button>
         </div>
       </div>
+
+      {/* Active Yard Filter Notice */}
+      {selectedSite !== 'All Sites' && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-purple-50/80 border border-purple-200 text-xs text-purple-900 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
+            <span>
+              Virtual Yard inventory scoped to yard / site location: <strong>{selectedSite}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => setSelectedSite('All Sites')}
+            className="text-[11px] font-semibold text-purple-700 hover:underline"
+          >
+            Show All Yards
+          </button>
+        </div>
+      )}
+
 
       {/* Filter Row */}
       <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

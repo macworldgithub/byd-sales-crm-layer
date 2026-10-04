@@ -18,12 +18,20 @@ import {
   X,
   Send,
 } from 'lucide-react';
-import { useCrm } from '@/lib/crmContext';
+import { useCrm, matchesSite } from '@/lib/crmContext';
 import { CONSULTANT_SCORES } from '@/lib/data';
 
 export function TeamScoreboardView() {
   const { selectedSite, addToast, boardTeam, updateConsultantTarget } = useCrm();
-  const [siteFilter, setSiteFilter] = useState<string>('All');
+  const [siteFilter, setSiteFilter] = useState<string>(() => (selectedSite !== 'All Sites' ? selectedSite : 'All'));
+
+  useEffect(() => {
+    if (selectedSite && selectedSite !== 'All Sites') {
+      setSiteFilter(selectedSite);
+    } else {
+      setSiteFilter('All');
+    }
+  }, [selectedSite]);
 
   // Target Quota Modal State
   const [isQuotaModalOpen, setIsQuotaModalOpen] = useState(false);
@@ -37,9 +45,10 @@ export function TeamScoreboardView() {
     : CONSULTANT_SCORES;
 
   const filteredConsultants = baseScores.filter((c: any) => {
-    if (siteFilter !== 'All' && c.site !== siteFilter) return false;
+    if (siteFilter !== 'All' && !matchesSite(c.site, siteFilter)) return false;
     return true;
   });
+
 
   const totalDepartmentUnits = filteredConsultants.reduce((s: number, c: any) => s + (c.written_units_mtd || 0), 0);
   const totalDepartmentTarget = filteredConsultants.reduce((s: number, c: any) => s + (c.target_units || 16), 0);
@@ -96,13 +105,16 @@ export function TeamScoreboardView() {
           <select
             value={siteFilter}
             onChange={(e) => setSiteFilter(e.target.value)}
-            className="flex-1 sm:flex-initial text-xs p-2.5 rounded-xl border border-slate-200 bg-white font-medium outline-none shadow-sm min-w-[140px]"
+            className="flex-1 sm:flex-initial text-xs p-2.5 rounded-xl border border-slate-200 bg-white font-medium outline-none shadow-sm min-w-[160px]"
           >
-            <option value="All">All Showroom Sites</option>
-            <option value="Fairfield">Fairfield</option>
-            <option value="Melbourne City">Melbourne City</option>
-            <option value="Doncaster">Doncaster</option>
-            <option value="Nunawading">Nunawading</option>
+            <option value="All">All Sites & Yards</option>
+            <option value="BYD Melbourne City">BYD Melbourne City</option>
+            <option value="BYD Caroline Springs">BYD Caroline Springs</option>
+            <option value="BYD Nunawading">BYD Nunawading</option>
+            <option value="BYD Fairfield">BYD Fairfield</option>
+            <option value="Denza Melbourne">Denza Melbourne</option>
+            <option value="Holding Yard VIC">Holding Yard VIC</option>
+            <option value="BYD Doncaster">BYD Doncaster</option>
           </select>
 
           <button
