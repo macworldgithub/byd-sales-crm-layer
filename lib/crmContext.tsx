@@ -323,13 +323,19 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     try {
       const res = await syncApi.getDeliveryWatch(params);
       if (res.success && res.data) {
-        setDeliveryWatch(res.data);
+        const querySite = params.site || params.yard || params.location || (selectedSite !== 'All Sites' ? selectedSite : undefined);
+        const mapped = res.data.map((item: any) => ({
+          ...item,
+          site: item.site || (item.location ? (item.location.toLowerCase().includes('nunawading') ? 'BYD Nunawading' : item.location) : querySite) || 'BYD Nunawading',
+          location: item.location || item.site || querySite || 'Nunawading, VIC',
+        }));
+        setDeliveryWatch(mapped);
         if (res.pagination) setDeliveryWatchPagination(res.pagination);
       }
     } catch (err) {
       console.warn('fetchDeliveryWatch error:', err);
     }
-  }, []);
+  }, [selectedSite]);
 
   const fetchAppointments = useCallback(async (params: Record<string, any> = {}) => {
     try {
@@ -1512,9 +1518,21 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   );
 
   const filteredDeliveryWatch = deliveryWatch.filter((d) => {
+    if (
+      !selectedSite ||
+      selectedSite === 'All Sites' ||
+      selectedSite === 'All Locations' ||
+      selectedSite === 'All Sites & Yards' ||
+      selectedSite === 'All Yards' ||
+      selectedSite === 'All Departments' ||
+      selectedSite === 'All'
+    ) {
+      return true;
+    }
     const opp = opportunities.find((o) => o.opportunity_id === d.opportunity_id);
     const directSite = d.site || d.yard || d.dealer || d.department || d.location;
     const oppSite = opp?.site;
+    if (!directSite && !oppSite) return true;
     return matchesSite(directSite || oppSite, selectedSite);
   });
 
