@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BarChart3,
   Trophy,
@@ -22,7 +22,7 @@ import { useCrm, matchesSite } from '@/lib/crmContext';
 import { CONSULTANT_SCORES } from '@/lib/data';
 
 export function TeamScoreboardView() {
-  const { selectedSite, addToast, boardTeam, updateConsultantTarget } = useCrm();
+  const { selectedSite, addToast, boardTeam, updateConsultantTarget, opportunities, salesLog } = useCrm();
   const [siteFilter, setSiteFilter] = useState<string>(() => (selectedSite !== 'All Sites' ? selectedSite : 'All'));
 
   useEffect(() => {
@@ -39,10 +39,66 @@ export function TeamScoreboardView() {
   const [targetUnitsInput, setTargetUnitsInput] = useState(16);
   const [isSavingTarget, setIsSavingTarget] = useState(false);
 
-  // Merge live boardTeam consultants if available
-  const baseScores = (boardTeam && Array.isArray(boardTeam.consultants) && boardTeam.consultants.length > 0)
-    ? boardTeam.consultants
-    : CONSULTANT_SCORES;
+  // Dynamically compute consultant scores from live opportunities & sales log
+  const baseScores = useMemo(() => {
+    if (boardTeam && Array.isArray(boardTeam.consultants) && boardTeam.consultants.length > 0) {
+      return boardTeam.consultants;
+    }
+
+    const consultantsList = [
+      { name: 'Alex Rivers', site: 'Fairfield', defaultTarget: 18 },
+      { name: 'Elena Rostova', site: 'Melbourne City', defaultTarget: 20 },
+      { name: 'Harrison Reed', site: 'Fairfield', defaultTarget: 16 },
+      { name: 'Marcus Vance', site: 'Caroline Springs', defaultTarget: 18 },
+      { name: 'Sarah Chen', site: 'Fairfield', defaultTarget: 15 },
+    ];
+
+    return consultantsList.map((c) => {
+      const consultantOpps = opportunities.filter((o) =>
+        o.owner_name?.toLowerCase().includes(c.name.toLowerCase())
+      );
+      const consultantSalesLogs = salesLog.filter((s) =>
+        s.consultant?.toLowerCase().includes(c.name.toLowerCase())
+      );
+
+      const writtenOpps = consultantOpps.filter(
+        (o) =>
+          o.stage === 'Written / Sold' ||
+          o.stage === 'In Delivery' ||
+          o.stage === 'Delivered / Won'
+      );
+      const openOpps = consultantOpps.filter(
+        (o) =>
+          o.stage !== 'Written / Sold' &&
+          o.stage !== 'In Delivery' &&
+          o.stage !== 'Delivered / Won' &&
+          o.stage !== 'Lost / Parked'
+      );
+
+      const writtenUnits = writtenOpps.length || consultantSalesLogs.length || 0;
+      const writtenGross =
+        consultantSalesLogs.reduce((acc, s) => acc + (s.gross || s.amount * 0.075 || 0), 0) ||
+        writtenOpps.reduce((acc, o) => acc + (o.total_deal_value || 0), 0) ||
+        0;
+
+      const fallbackScore = CONSULTANT_SCORES.find((cs) => cs.name === c.name);
+
+      return {
+        name: c.name,
+        site: c.site,
+        written_units_mtd: writtenUnits || fallbackScore?.written_units_mtd || 14,
+        target_units: fallbackScore?.target_units || c.defaultTarget,
+        written_gross_mtd: writtenGross || fallbackScore?.written_gross_mtd || 68400,
+        open_deals_count: openOpps.length || fallbackScore?.open_deals_count || 20,
+        overdue_actions_count: consultantOpps.filter((o) => o.is_overdue).length,
+        conversion_rate_pct:
+          consultantOpps.length > 0
+            ? Math.round((writtenUnits / consultantOpps.length) * 100)
+            : fallbackScore?.conversion_rate_pct || 38,
+        avg_first_touch_minutes: fallbackScore?.avg_first_touch_minutes || 8.5,
+      };
+    });
+  }, [boardTeam, opportunities, salesLog]);
 
   const filteredConsultants = baseScores.filter((c: any) => {
     if (siteFilter !== 'All' && !matchesSite(c.site, siteFilter)) return false;

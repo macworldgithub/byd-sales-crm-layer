@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Sparkles,
   TrendingUp,
@@ -49,24 +49,95 @@ export function HomeView({
     boardMe,
   } = useCrm();
 
-  const myScore = {
-    ...CONSULTANT_SCORES.find((s) => s.name === currentUser.name) || CONSULTANT_SCORES[0],
-    ...(boardMe ? {
-      written_units_mtd: boardMe.writtenUnitsMtd ?? 11,
-      target_units: boardMe.targetUnits ?? 16,
-      pace_pct: boardMe.pacePercentage ?? 69,
-      written_gross_mtd: boardMe.writtenGrossMtd ?? 34200,
-      conversion_rate_pct: boardMe.conversionRatePct ?? 22,
-    } : {}),
-  };
+  const isManagerOrAdmin =
+    currentRole === 'manager' || currentRole === 'super_admin' || currentRole === 'site_admin';
+
+  // 1. Dynamic Site-Filtered Opportunities
+  const siteFilteredOpps = useMemo(() => {
+    return opportunities.filter((o) => {
+      if (selectedSite && selectedSite !== 'All Sites') {
+        const cleanSite = selectedSite.toLowerCase().replace(/^byd\s+/i, '').trim();
+        if (!o.site.toLowerCase().includes(cleanSite)) return false;
+      }
+      return true;
+    });
+  }, [opportunities, selectedSite]);
+
+  // 2. Opportunities filtered for current user / scope
+  const userOpps = useMemo(() => {
+    if (isManagerOrAdmin) return siteFilteredOpps;
+    return siteFilteredOpps.filter(
+      (o) =>
+        o.owner_name?.toLowerCase() === currentUser.name?.toLowerCase() ||
+        o.owner_user_id === currentUser.id
+    );
+  }, [siteFilteredOpps, isManagerOrAdmin, currentUser]);
+
+  // 3. Allocations filtered for current site and user
+  const siteFilteredAllocations = useMemo(() => {
+    return allocations.filter((a) => {
+      if (selectedSite && selectedSite !== 'All Sites') {
+        const cleanSite = selectedSite.toLowerCase().replace(/^byd\s+/i, '').trim();
+        if (!a.site.toLowerCase().includes(cleanSite)) return false;
+      }
+      return true;
+    });
+  }, [allocations, selectedSite]);
+
+  const userAllocations = useMemo(() => {
+    if (isManagerOrAdmin) return siteFilteredAllocations;
+    return siteFilteredAllocations.filter(
+      (a) => a.assigned_to?.toLowerCase() === currentUser.name?.toLowerCase()
+    );
+  }, [siteFilteredAllocations, isManagerOrAdmin, currentUser]);
+
+  // 4. Dynamically calculated Written/Won Deals
+  const writtenDeals = useMemo(() => {
+    return userOpps.filter(
+      (o) =>
+        o.stage === 'Written / Sold' ||
+        o.stage === 'In Delivery' ||
+        o.stage === 'Delivered / Won'
+    );
+  }, [userOpps]);
+
+  // Dynamic Metrics
+  const writtenUnitsCount = boardMe?.writtenUnitsMtd ?? writtenDeals.length;
+  const targetUnitsCount = boardMe?.targetUnits ?? (isManagerOrAdmin ? 18 * 4 : 18);
+  const quotaPacePct = Math.round((writtenUnitsCount / Math.max(1, targetUnitsCount)) * 100);
+
+  const writtenGrossAmount =
+    boardMe?.writtenGrossMtd ??
+    writtenDeals.reduce((sum, o) => sum + (o.total_deal_value || o.list_price || 60000), 0);
+
+  const avgGrossPerUnit =
+    writtenUnitsCount > 0 ? Math.round(writtenGrossAmount / writtenUnitsCount) : 0;
+
+  const totalHandledDeals = userOpps.length + userAllocations.length;
+  const liveConversionRate =
+    boardMe?.conversionRatePct ??
+    (totalHandledDeals > 0 ? Math.round((writtenUnitsCount / totalHandledDeals) * 100) : 38);
 
   // Urgent SLA Allocations (< 15 mins)
-  const urgentAllocations = allocations.filter((a) => a.status === 'pending' || a.status === 'escalated');
+  const urgentAllocations = userAllocations.filter(
+    (a) => a.status === 'pending' || a.status === 'escalated'
+  );
 
-  // Overdue or Today's Deals
-  const urgentDeals = opportunities.filter(
+  // Overdue or Today's Actionable Deals
+  const urgentDeals = userOpps.filter(
     (o) => o.is_overdue || o.stage === 'New / Allocated' || o.stage === 'Negotiation'
   );
+
+  // Today's appointments filtered by site
+  const siteAppointments = useMemo(() => {
+    return appointments.filter((appt) => {
+      if (selectedSite && selectedSite !== 'All Sites') {
+        const cleanSite = selectedSite.toLowerCase().replace(/^byd\s+/i, '').trim();
+        if (!appt.site.toLowerCase().includes(cleanSite)) return false;
+      }
+      return true;
+    });
+  }, [appointments, selectedSite]);
 
   return (
     <div className="view-stack">
@@ -74,7 +145,7 @@ export function HomeView({
       <div className="page-intro">
         <div>
           <span className="eyebrow flex items-center gap-1.5 font-mono">
-            <span className="w-2 h-2 rounded-full bg-[#e60012]" />
+            <span className="w-2 h-2 rounded-full bg-[#e60012] animate-pulse" />
             Operating Sales Desk · {selectedSite}
           </span>
           <h1 className="page-title mt-1">
@@ -122,11 +193,11 @@ export function HomeView({
             </div>
           </div>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="metric-value">{myScore.written_units_mtd}</span>
-            <span className="text-slate-400 font-semibold text-sm">/ {myScore.target_units} Target</span>
+            <span className="metric-value">{writtenUnitsCount}</span>
+            <span className="text-slate-400 font-semibold text-sm">/ {targetUnitsCount} Target</span>
           </div>
-          <div className="metric-change text-emerald-600">
-            {Math.round((myScore.written_units_mtd / myScore.target_units) * 100)}% of monthly quota
+          <div className="metric-change text-emerald-600 font-medium">
+            {quotaPacePct}% of monthly quota ({writtenDeals.length} deals live)
           </div>
         </div>
 
@@ -139,10 +210,10 @@ export function HomeView({
             </div>
           </div>
           <div className="metric-value mt-1">
-            ${myScore.written_gross_mtd.toLocaleString()}
+            ${writtenGrossAmount.toLocaleString()}
           </div>
-          <div className="metric-change text-slate-500">
-            Avg Gross: ${(myScore.written_gross_mtd / myScore.written_units_mtd).toFixed(0)} / unit
+          <div className="metric-change text-slate-500 font-medium">
+            Avg Gross: ${avgGrossPerUnit.toLocaleString()} / unit
           </div>
         </div>
 
@@ -154,9 +225,9 @@ export function HomeView({
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className="metric-value mt-1">{myScore.conversion_rate_pct}%</div>
-          <div className="metric-change text-emerald-600">
-            Allocated › Appt › Written
+          <div className="metric-value mt-1">{liveConversionRate}%</div>
+          <div className="metric-change text-emerald-600 font-medium">
+            {writtenUnitsCount} won of {totalHandledDeals} pipeline items
           </div>
         </div>
 
@@ -172,8 +243,8 @@ export function HomeView({
             <span className="metric-value text-amber-700">{urgentAllocations.length}</span>
             <span className="text-slate-500 font-medium text-xs">Unworked Leads</span>
           </div>
-          <div className="metric-change text-slate-500">
-            Avg 1st touch: {myScore.avg_first_touch_minutes} min
+          <div className="metric-change text-slate-500 font-medium">
+            Avg 1st touch: {boardMe?.avgFirstTouchMinutes ?? 8.8} min
           </div>
         </div>
       </div>
@@ -194,7 +265,7 @@ export function HomeView({
                 onClick={() => onNavigateTab('inbox')}
                 className="text-link"
               >
-                <span>View All ({allocations.length})</span>
+                <span>View All ({userAllocations.length})</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -277,7 +348,7 @@ export function HomeView({
             </div>
 
             <div className="p-3 space-y-2">
-              {appointments.slice(0, 3).map((appt) => (
+              {siteAppointments.slice(0, 3).map((appt) => (
                 <div
                   key={appt.appointment_id}
                   className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-xs"
@@ -313,7 +384,7 @@ export function HomeView({
                 <h3 className="section-title text-xl">Deals Requiring Immediate Action</h3>
               </div>
               <button onClick={() => onNavigateTab('pipeline')} className="text-link">
-                <span>View Full Pipeline ({opportunities.length})</span>
+                <span>View Full Pipeline ({userOpps.length})</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
