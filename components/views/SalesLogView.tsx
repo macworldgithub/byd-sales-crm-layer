@@ -22,6 +22,9 @@ export function SalesLogView() {
 
   const [searchFilter, setSearchFilter] = useState('');
   const [reconciledFilter, setReconciledFilter] = useState('All');
+  const [siteFilter, setSiteFilter] = useState<string>(() => (selectedSite !== 'All Sites' ? selectedSite : 'All Locations'));
+  const [consultantFilter, setConsultantFilter] = useState('All');
+  const [saleTypeFilter, setSaleTypeFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [showMappingModal, setShowMappingModal] = useState(false);
@@ -38,6 +41,13 @@ export function SalesLogView() {
     invoicedAud: 'Total_Invoiced_AUD',
     grossMargin: 'Deal_Gross_Profit',
   });
+
+  // Sync siteFilter with global selectedSite
+  React.useEffect(() => {
+    if (selectedSite && selectedSite !== 'All Sites') {
+      setSiteFilter(selectedSite);
+    }
+  }, [selectedSite]);
 
   React.useEffect(() => {
     import('@/lib/api').then(({ syncApi }) => {
@@ -63,19 +73,22 @@ export function SalesLogView() {
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
+      const effectiveSite = siteFilter !== 'All Locations' ? siteFilter : (selectedSite !== 'All Sites' ? selectedSite : undefined);
       fetchSalesLog({
         page: currentPage,
         limit: pageSize,
         q: searchFilter.trim() || undefined,
-        reconciled: reconciledFilter === 'All' ? undefined : reconciledFilter === 'Reconciled',
-        site: selectedSite !== 'All Sites' ? selectedSite : undefined,
-        yard: selectedSite !== 'All Sites' ? selectedSite : undefined,
-        location: selectedSite !== 'All Sites' ? selectedSite : undefined,
-        department: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        reconciled: reconciledFilter === 'All' ? undefined : (reconciledFilter === 'Exceptions' ? 'exception' : (reconciledFilter === 'Reconciled')),
+        site: effectiveSite,
+        yard: effectiveSite,
+        location: effectiveSite,
+        department: effectiveSite,
+        consultant: consultantFilter !== 'All' ? consultantFilter : undefined,
+        sale_type: saleTypeFilter !== 'All' ? saleTypeFilter : undefined,
       });
     }, 250);
     return () => clearTimeout(timer);
-  }, [currentPage, pageSize, searchFilter, reconciledFilter, selectedSite, fetchSalesLog]);
+  }, [currentPage, pageSize, searchFilter, reconciledFilter, siteFilter, consultantFilter, saleTypeFilter, selectedSite, fetchSalesLog]);
 
   const isException = (entry: SalesLogEntry) => {
     return (
@@ -91,6 +104,8 @@ export function SalesLogView() {
     if (reconciledFilter === 'Reconciled' && !entry.reconciled) return false;
     if (reconciledFilter === 'Unreconciled' && entry.reconciled) return false;
     if (reconciledFilter === 'Exceptions' && !isException(entry)) return false;
+    if (consultantFilter !== 'All' && entry.consultant !== consultantFilter) return false;
+    if (saleTypeFilter !== 'All' && entry.sale_type !== saleTypeFilter) return false;
     if (searchFilter.trim()) {
       const q = searchFilter.toLowerCase();
       const matchCustomer = entry.customer_name.toLowerCase().includes(q);
@@ -101,6 +116,38 @@ export function SalesLogView() {
     }
     return true;
   });
+
+  const hasActiveFilters = Boolean(
+    searchFilter.trim() ||
+    reconciledFilter !== 'All' ||
+    (siteFilter !== 'All Locations' && siteFilter !== selectedSite) ||
+    consultantFilter !== 'All' ||
+    saleTypeFilter !== 'All'
+  );
+
+  const clearAllFilters = () => {
+    setSearchFilter('');
+    setReconciledFilter('All');
+    setSiteFilter(selectedSite !== 'All Sites' ? selectedSite : 'All Locations');
+    setConsultantFilter('All');
+    setSaleTypeFilter('All');
+    setCurrentPage(1);
+  };
+
+  const SITES = [
+    'All Locations',
+    'BYD Nunawading',
+    'BYD Melbourne City',
+    'BYD Fairfield',
+    'BYD Caroline Springs',
+    'BYD Doncaster',
+    'Denza Melbourne',
+    'Holding Yard VIC',
+    'Nunawading',
+    'Fairfield',
+    'Melbourne City',
+    'Caroline Springs',
+  ];
 
   const totalWrittenAmount = filteredSalesLog.reduce((sum, s) => sum + s.amount, 0);
   const totalWrittenGross = filteredSalesLog.reduce((sum, s) => sum + (s.gross || 0), 0);
@@ -243,9 +290,9 @@ export function SalesLogView() {
       </div>
 
       {/* Filter Row */}
-      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 w-full">
-          <div className="relative flex-1">
+      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
@@ -257,20 +304,66 @@ export function SalesLogView() {
           </div>
 
           <select
+            value={siteFilter}
+            onChange={(e) => setSiteFilter(e.target.value)}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+          >
+            {SITES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <select
             value={reconciledFilter}
             onChange={(e) => setReconciledFilter(e.target.value)}
-            className="w-full sm:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
           >
-            <option value="All">All Statuses ({salesLog.length})</option>
+            <option value="All">All Reconciliation Statuses</option>
             <option value="Reconciled">Reconciled with Finance</option>
             <option value="Unreconciled">Pending Reconciliation</option>
             <option value="Exceptions">⚠️ Exception Queue (Discrepancies)</option>
           </select>
+
+          <select
+            value={consultantFilter}
+            onChange={(e) => setConsultantFilter(e.target.value)}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+          >
+            <option value="All">All Consultants</option>
+            <option value="Alex Rivers">Alex Rivers</option>
+            <option value="Sarah Chen">Sarah Chen</option>
+            <option value="Marcus Vance">Marcus Vance</option>
+          </select>
         </div>
 
-        <span className="text-xs font-mono text-slate-400 shrink-0 text-right sm:text-left pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-          Showing {filteredSalesLog.length} ledger entries
-        </span>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 text-xs">
+          <div className="flex items-center gap-2">
+            <select
+              value={saleTypeFilter}
+              onChange={(e) => setSaleTypeFilter(e.target.value)}
+              className="text-xs p-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+            >
+              <option value="All">All Sale Types</option>
+              <option value="Retail">Retail</option>
+              <option value="Fleet">Fleet / Novated</option>
+              <option value="Commercial">Commercial / ABN</option>
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 font-semibold transition-colors cursor-pointer"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+
+          <span className="font-mono text-slate-500 text-right sm:text-left">
+            Showing <strong className="text-slate-900 font-bold">{filteredSalesLog.length}</strong> of{' '}
+            <strong className="text-slate-900 font-bold">{salesLogPagination?.total ?? salesLog.length}</strong> ledger entries
+          </span>
+        </div>
       </div>
 
       {/* Sales Log Table */}

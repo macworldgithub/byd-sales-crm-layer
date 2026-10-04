@@ -33,6 +33,12 @@ export function DeliveriesView() {
 
   const [searchFilter, setSearchFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('All');
+  const [siteFilter, setSiteFilter] = useState<string>(() => (selectedSite !== 'All Sites' ? selectedSite : 'All Locations'));
+  const [consultantFilter, setConsultantFilter] = useState('All');
+  const [contactStatusFilter, setContactStatusFilter] = useState('All');
+  const [docsFilter, setDocsFilter] = useState('All');
+  const [timeframeFilter, setTimeframeFilter] = useState('All');
+
   const [selectedClientForNote, setSelectedClientForNote] = useState<DeliveryHandoverWatch | null>(null);
   const [noteText, setNoteText] = useState('');
 
@@ -44,27 +50,58 @@ export function DeliveriesView() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Debounced server-side fetch on search, stage, page, site or limit change
+  // Sync siteFilter with global selectedSite
+  useEffect(() => {
+    if (selectedSite && selectedSite !== 'All Sites') {
+      setSiteFilter(selectedSite);
+    }
+  }, [selectedSite]);
+
+  // Debounced server-side fetch on search, stage, site, consultant, docs, timeframe
   useEffect(() => {
     const timer = setTimeout(() => {
+      const effectiveSite = siteFilter !== 'All Locations' ? siteFilter : (selectedSite !== 'All Sites' ? selectedSite : undefined);
       fetchDeliveryWatch({
         page: currentPage,
         limit: pageSize,
         q: searchFilter.trim() || undefined,
         stage: stageFilter !== 'All' ? stageFilter : undefined,
-        site: selectedSite !== 'All Sites' ? selectedSite : undefined,
-        yard: selectedSite !== 'All Sites' ? selectedSite : undefined,
-        location: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        site: effectiveSite,
+        yard: effectiveSite,
+        location: effectiveSite,
+        consultant: consultantFilter !== 'All' ? consultantFilter : undefined,
+        contact_status: contactStatusFilter !== 'All' ? contactStatusFilter : undefined,
+        docs_completeness: docsFilter !== 'All' ? docsFilter : undefined,
+        timeframe: timeframeFilter !== 'All' ? timeframeFilter : undefined,
       });
     }, 250);
     return () => clearTimeout(timer);
-  }, [currentPage, pageSize, searchFilter, stageFilter, selectedSite, fetchDeliveryWatch]);
+  }, [currentPage, pageSize, searchFilter, stageFilter, siteFilter, consultantFilter, contactStatusFilter, docsFilter, timeframeFilter, selectedSite, fetchDeliveryWatch]);
 
+  const hasActiveFilters = Boolean(
+    searchFilter.trim() ||
+    stageFilter !== 'All' ||
+    (siteFilter !== 'All Locations' && siteFilter !== selectedSite) ||
+    consultantFilter !== 'All' ||
+    contactStatusFilter !== 'All' ||
+    docsFilter !== 'All' ||
+    timeframeFilter !== 'All'
+  );
 
-  const handleFilterChange = (type: 'search' | 'stage', val: string) => {
+  const clearAllFilters = () => {
+    setSearchFilter('');
+    setStageFilter('All');
+    setSiteFilter(selectedSite !== 'All Sites' ? selectedSite : 'All Locations');
+    setConsultantFilter('All');
+    setContactStatusFilter('All');
+    setDocsFilter('All');
+    setTimeframeFilter('All');
     setCurrentPage(1);
-    if (type === 'search') setSearchFilter(val);
-    if (type === 'stage') setStageFilter(val);
+  };
+
+  const handleFilterChange = (setter: React.Dispatch<React.SetStateAction<string>>, val: string) => {
+    setCurrentPage(1);
+    setter(val);
   };
 
   const handleSendNote = (e: React.FormEvent) => {
@@ -87,6 +124,21 @@ export function DeliveriesView() {
     setRequestedDate('');
   };
 
+  const SITES = [
+    'All Locations',
+    'BYD Nunawading',
+    'BYD Melbourne City',
+    'BYD Fairfield',
+    'BYD Caroline Springs',
+    'BYD Doncaster',
+    'Denza Melbourne',
+    'Holding Yard VIC',
+    'Nunawading',
+    'Fairfield',
+    'Melbourne City',
+    'Caroline Springs',
+  ];
+
   return (
     <div className="view-stack">
       {/* Intro Header */}
@@ -98,48 +150,39 @@ export function DeliveriesView() {
           </span>
           <h1 className="page-title mt-1">Delivery & Handover Operations</h1>
           <p className="page-subtitle">
-            Read-only projection of the post-sale handover pipeline from Delivery Centre ({deliveryWatchPagination?.total ?? 109} active clients). Track PDI progress, paperwork verification, delivery date slots, and transmit handover notes.
+            Read-only projection of the post-sale handover pipeline from Delivery Centre ({deliveryWatchPagination?.total ?? deliveryWatch.length} active clients). Track PDI progress, paperwork verification, delivery date slots, and transmit handover notes.
           </p>
         </div>
       </div>
 
-      {/* Active Yard Filter Notice */}
-      {selectedSite !== 'All Sites' && (
-        <div className="flex items-center justify-between p-3 rounded-xl bg-red-50/80 border border-red-200 text-xs text-red-900 animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#e60012] animate-pulse" />
-            <span>
-              Deliveries & PDI Handovers scoped to yard / site: <strong>{selectedSite}</strong>
-            </span>
-          </div>
-          <button
-            onClick={() => setSelectedSite('All Sites')}
-            className="text-[11px] font-semibold text-[#e60012] hover:underline"
-          >
-            Show All Sites
-          </button>
-        </div>
-      )}
-
-
-      {/* Filter Row */}
-      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 w-full">
-          <div className="relative flex-1">
+      {/* Filter Row 1: Search & Site & Stage */}
+      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
               value={searchFilter}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              placeholder="Search customer, vehicle, VIN..."
+              onChange={(e) => handleFilterChange(setSearchFilter, e.target.value)}
+              placeholder="Search buyer, vehicle, VIN, rego..."
               className="w-full text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
             />
           </div>
 
           <select
+            value={siteFilter}
+            onChange={(e) => handleFilterChange(setSiteFilter, e.target.value)}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+          >
+            {SITES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <select
             value={stageFilter}
-            onChange={(e) => handleFilterChange('stage', e.target.value)}
-            className="w-full sm:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            onChange={(e) => handleFilterChange(setStageFilter, e.target.value)}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
           >
             <option value="All">All Delivery Stages</option>
             <option value="Scheduled">Scheduled</option>
@@ -148,12 +191,59 @@ export function DeliveriesView() {
             <option value="Ready for Pickup">Ready for Pickup</option>
             <option value="Delivered">Delivered</option>
           </select>
+
+          <select
+            value={timeframeFilter}
+            onChange={(e) => handleFilterChange(setTimeframeFilter, e.target.value)}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+          >
+            <option value="All">All Dates / Slots</option>
+            <option value="Today">Delivering Today</option>
+            <option value="Tomorrow">Delivering Tomorrow</option>
+            <option value="This Week">Delivering This Week</option>
+            <option value="Overdue">Overdue / Delayed</option>
+          </select>
         </div>
 
-        <span className="text-xs font-mono text-slate-500 shrink-0 text-right sm:text-left pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-          Showing <strong className="text-slate-900 font-bold">{deliveryWatch.length}</strong> of{' '}
-          <strong className="text-slate-900 font-bold">{deliveryWatchPagination?.total ?? deliveryWatch.length}</strong> clients
-        </span>
+        {/* Filter Row 2: Secondary refinement & action */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={docsFilter}
+              onChange={(e) => handleFilterChange(setDocsFilter, e.target.value)}
+              className="text-xs p-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+            >
+              <option value="All">All Paperwork</option>
+              <option value="Complete">Docs Complete (ATR Signed)</option>
+              <option value="Partial">Docs Pending / Incomplete</option>
+            </select>
+
+            <select
+              value={contactStatusFilter}
+              onChange={(e) => handleFilterChange(setContactStatusFilter, e.target.value)}
+              className="text-xs p-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+            >
+              <option value="All">All Contact Status</option>
+              <option value="Confirmed">Confirmed</option>
+              <option value="Attempted">Attempted</option>
+              <option value="Unreachable">Unreachable</option>
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 font-semibold transition-colors cursor-pointer"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+
+          <span className="font-mono text-slate-500 text-right sm:text-left">
+            Showing <strong className="text-slate-900 font-bold">{deliveryWatch.length}</strong> of{' '}
+            <strong className="text-slate-900 font-bold">{deliveryWatchPagination?.total ?? deliveryWatch.length}</strong> clients
+          </span>
+        </div>
       </div>
 
       {/* Handover Cards */}

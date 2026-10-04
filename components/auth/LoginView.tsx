@@ -16,30 +16,29 @@ export function LoginView({ onSuccess }: LoginViewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async (e?: React.FormEvent) => {
+  const handleLogin = async (e?: React.FormEvent, customCredentials?: { email: string; password: string }) => {
     if (e) e.preventDefault();
     setLoading(true);
     setError(null);
 
+    const creds = customCredentials || { email: email.trim(), password };
+
     try {
-      const res = await authApi.login({ email, password });
-      if (res.success && res.data) {
-        const tokenVal = res.data.access_token || (res.data as any).token;
-        if (tokenVal) {
-          setToken(tokenVal);
-        }
+      const res = await authApi.login(creds);
+      if (res.success && res.data?.access_token) {
+        setToken(res.data.access_token);
         if (typeof window !== 'undefined') {
           localStorage.setItem('byd_crm_auth', 'true');
         }
-        const u = res.data.user;
+        const u = res.data.user || {};
         setCurrentUser({
           id: u.id || u._id || 'usr-001',
-          name: u.name || 'Alex Rivers',
-          email: u.email,
+          name: u.name || 'Sales Consultant',
+          email: u.email || creds.email,
           role: u.role || 'sales_consultant',
           site: u.site || 'Fairfield',
           team: u.team || 'Sales Floor',
-          avatarInitials: (u.name || 'AR')
+          avatarInitials: (u.name || 'SC')
             .split(' ')
             .map((n: string) => n[0])
             .join('')
@@ -48,27 +47,10 @@ export function LoginView({ onSuccess }: LoginViewProps) {
         });
         if (u.role) setCurrentRole(u.role);
         if (u.site) setSelectedSite(u.site);
-        addToast('success', 'Authenticated Successfully', `Welcome back, ${u.name || 'Consultant'}.`);
+        addToast('success', 'Authenticated Successfully', `Welcome, ${u.name || 'Consultant'}.`);
         if (onSuccess) onSuccess();
       } else {
-        // Fallback desk session if demo password isn't set
-        const deskRes = await authApi.getDeskSession();
-        if (deskRes.success && deskRes.data) {
-          const u = deskRes.data.user;
-          setCurrentUser({
-            id: u.id || 'usr-001',
-            name: u.name,
-            email: u.email,
-            role: u.role,
-            site: u.site || 'Fairfield',
-            team: 'Sales Floor',
-            avatarInitials: 'AR',
-          });
-          addToast('success', 'Desk Session Initialized', `Signed in as ${u.name}.`);
-          if (onSuccess) onSuccess();
-        } else {
-          setError(res.message || 'Invalid credentials. Please verify your email and password.');
-        }
+        setError(res.message || 'Invalid email or password. Please verify your credentials.');
       }
     } catch (err: any) {
       setError(err.message || 'Network error occurred during authentication.');
@@ -78,36 +60,16 @@ export function LoginView({ onSuccess }: LoginViewProps) {
   };
 
   const quickRoles = [
-    { name: 'Alex Rivers', role: 'sales_consultant', email: 'alex.rivers@bydsouthport.com.au', label: 'Sales Consultant', site: 'Fairfield' },
-    { name: 'Sarah Chen', role: 'sales_manager', email: 'sarah.chen@bydsouthport.com.au', label: 'Floor Manager', site: 'Fairfield' },
-    { name: 'Marcus Vance', role: 'bdc', email: 'marcus.vance@bydsouthport.com.au', label: 'BDC Lead Controller', site: 'Melbourne City' },
-    { name: 'Elena Rostova', role: 'super_admin', email: 'elena.rostova@bydsouthport.com.au', label: 'Super Admin', site: 'All Sites' },
+    { name: 'Alex Rivers', role: 'sales_consultant', email: 'alex.rivers@bydsouthport.com.au', password: 'BYD2026!Demo', label: 'Sales Consultant', site: 'Fairfield' },
+    { name: 'Sarah Chen', role: 'sales_manager', email: 'sarah.chen@bydsouthport.com.au', password: 'BYD2026!Demo', label: 'Floor Manager', site: 'Fairfield' },
+    { name: 'Marcus Vance', role: 'bdc', email: 'marcus.vance@bydsouthport.com.au', password: 'BYD2026!Demo', label: 'BDC Lead Controller', site: 'Melbourne City' },
+    { name: 'BYD Admin', role: 'admin', email: 'admin@byd.com', password: 'BYD@Admin2024', label: 'System Admin', site: 'All Sites' },
   ];
 
   const handleQuickSwitch = async (r: typeof quickRoles[0]) => {
     setEmail(r.email);
-    setPassword('BYD2026!Demo');
-    setLoading(true);
-    try {
-      const res = await authApi.getDeskSession();
-      if (res.success) {
-        setCurrentUser({
-          id: `usr-${r.role}`,
-          name: r.name,
-          email: r.email,
-          role: r.role as any,
-          site: r.site as any,
-          team: 'Sales Operations',
-          avatarInitials: r.name.split(' ').map((n) => n[0]).join(''),
-        });
-        setCurrentRole(r.role as any);
-        setSelectedSite(r.site as any);
-        addToast('success', 'Role Profile Loaded', `Active as ${r.name} (${r.label})`);
-        if (onSuccess) onSuccess();
-      }
-    } finally {
-      setLoading(false);
-    }
+    setPassword(r.password);
+    await handleLogin(undefined, { email: r.email, password: r.password });
   };
 
   return (
@@ -186,25 +148,42 @@ export function LoginView({ onSuccess }: LoginViewProps) {
 
           {/* Quick Desk Role Switcher */}
           <div className="pt-4 border-t border-slate-800 space-y-2">
-            <span className="text-[10px] font-mono text-slate-500 font-bold uppercase tracking-wider block text-center">
-              Quick Role Switcher (Pre-Configured Desk Profiles)
-            </span>
+            <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider">
+              <span>Quick Role Switcher</span>
+              <span className="text-emerald-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Verified
+              </span>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {quickRoles.map((r) => (
                 <button
-                  key={r.role}
+                  key={r.email}
                   type="button"
                   onClick={() => handleQuickSwitch(r)}
-                  className="p-2 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-slate-700 text-left transition-all group"
+                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-red-600/60 text-left transition-all group cursor-pointer"
                 >
                   <div className="text-[11px] font-bold text-slate-200 group-hover:text-[#e60012] truncate">
                     {r.name}
                   </div>
-                  <div className="text-[10px] font-mono text-slate-500 truncate">
+                  <div className="text-[10px] font-mono text-slate-400 truncate">
                     {r.label}
+                  </div>
+                  <div className="text-[9px] font-mono text-slate-500 truncate mt-0.5">
+                    {r.site}
                   </div>
                 </button>
               ))}
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/60 text-[10px] font-mono text-slate-400 space-y-1">
+              <div className="text-slate-300 font-semibold flex items-center justify-between">
+                <span>Verified Credentials</span>
+                <span className="text-slate-500">MongoDB Bcrypt</span>
+              </div>
+              <div className="text-slate-400">
+                Staff: <strong className="text-slate-200">BYD2026!Demo</strong> | Admin: <strong className="text-slate-200">BYD@Admin2024</strong>
+              </div>
             </div>
           </div>
         </div>

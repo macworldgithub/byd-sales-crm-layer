@@ -40,12 +40,43 @@ export default function SalesCrmApp() {
   const { toasts, removeToast, allocations, opportunities, customers } = useCrm();
 
   // Auth gate state (§8.1)
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return Boolean(getToken() || localStorage.getItem('byd_crm_auth') === 'true');
+  const [mounted, setMounted] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
+
+  // Check auth on mount
+  React.useEffect(() => {
+    setMounted(true);
+    const token = getToken();
+    if (!token) {
+      setIsAuthenticated(false);
+      setIsCheckingAuth(false);
+      return;
     }
-    return true; // Default during SSR
-  });
+
+    // Verify token validity with backend
+    import('@/lib/api').then(({ authApi, clearToken }) => {
+      authApi
+        .getMe()
+        .then((res) => {
+          if (res.success && res.data) {
+            setIsAuthenticated(true);
+          } else {
+            clearToken();
+            if (typeof window !== 'undefined') localStorage.removeItem('byd_crm_auth');
+            setIsAuthenticated(false);
+          }
+        })
+        .catch(() => {
+          clearToken();
+          if (typeof window !== 'undefined') localStorage.removeItem('byd_crm_auth');
+          setIsAuthenticated(false);
+        })
+        .finally(() => {
+          setIsCheckingAuth(false);
+        });
+    });
+  }, []);
 
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<string>('home');
@@ -65,7 +96,7 @@ export default function SalesCrmApp() {
 
   // Deep Link handler from Delivery Centre or Lead Centre (?customer_id=... or ?search=...)
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !isAuthenticated) return;
     const params = new URLSearchParams(window.location.search);
     const customerIdParam = params.get('customer_id');
     const searchParam = params.get('search');
@@ -92,7 +123,20 @@ export default function SalesCrmApp() {
         if (custMatch) setSelected360Customer(custMatch);
       }
     }
-  }, [customers, opportunities]);
+  }, [customers, opportunities, isAuthenticated]);
+
+  if (!mounted || isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 p-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-mono text-slate-400 uppercase tracking-widest animate-pulse">
+            Verifying BYD CRM Clearance...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <LoginView onSuccess={() => setIsAuthenticated(true)} />;

@@ -34,30 +34,73 @@ export function CustomersView({
 
   const [searchFilter, setSearchFilter] = useState('');
   const [recordTypeFilter, setRecordTypeFilter] = useState<string>('All');
+  const [siteFilter, setSiteFilter] = useState<string>(() => (selectedSite !== 'All Sites' ? selectedSite : 'All Locations'));
+  const [consultantFilter, setConsultantFilter] = useState<string>('All');
+  const [sourceFilter, setSourceFilter] = useState<string>('All');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
 
+  // Sync siteFilter with global selectedSite
+  useEffect(() => {
+    if (selectedSite && selectedSite !== 'All Sites') {
+      setSiteFilter(selectedSite);
+    }
+  }, [selectedSite]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
+      const effectiveSite = siteFilter !== 'All Locations' ? siteFilter : (selectedSite !== 'All Sites' ? selectedSite : undefined);
       fetchCustomers({
         page: currentPage,
         limit: pageSize,
         q: searchFilter.trim() || undefined,
         record_type: recordTypeFilter !== 'All' ? recordTypeFilter : undefined,
-        site: selectedSite !== 'All Sites' ? selectedSite : undefined,
-        yard: selectedSite !== 'All Sites' ? selectedSite : undefined,
-        location: selectedSite !== 'All Sites' ? selectedSite : undefined,
+        site: effectiveSite,
+        yard: effectiveSite,
+        location: effectiveSite,
+        owner: consultantFilter !== 'All' ? consultantFilter : undefined,
+        source: sourceFilter !== 'All' ? sourceFilter : undefined,
       });
     }, 250);
     return () => clearTimeout(timer);
-  }, [currentPage, pageSize, searchFilter, recordTypeFilter, selectedSite, fetchCustomers]);
+  }, [currentPage, pageSize, searchFilter, recordTypeFilter, siteFilter, consultantFilter, sourceFilter, selectedSite, fetchCustomers]);
 
+  const hasActiveFilters = Boolean(
+    searchFilter.trim() ||
+    recordTypeFilter !== 'All' ||
+    (siteFilter !== 'All Locations' && siteFilter !== selectedSite) ||
+    consultantFilter !== 'All' ||
+    sourceFilter !== 'All'
+  );
 
-  const handleFilterChange = (type: 'search' | 'recordType', val: string) => {
+  const clearAllFilters = () => {
+    setSearchFilter('');
+    setRecordTypeFilter('All');
+    setSiteFilter(selectedSite !== 'All Sites' ? selectedSite : 'All Locations');
+    setConsultantFilter('All');
+    setSourceFilter('All');
     setCurrentPage(1);
-    if (type === 'search') setSearchFilter(val);
-    if (type === 'recordType') setRecordTypeFilter(val);
   };
+
+  const handleFilterChange = (setter: React.Dispatch<React.SetStateAction<string>>, val: string) => {
+    setCurrentPage(1);
+    setter(val);
+  };
+
+  const SITES = [
+    'All Locations',
+    'BYD Nunawading',
+    'BYD Melbourne City',
+    'BYD Fairfield',
+    'BYD Caroline Springs',
+    'BYD Doncaster',
+    'Denza Melbourne',
+    'Holding Yard VIC',
+    'Nunawading',
+    'Fairfield',
+    'Melbourne City',
+    'Caroline Springs',
+  ];
 
   return (
     <div className="view-stack">
@@ -77,14 +120,14 @@ export function CustomersView({
         <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <button
             onClick={onOpenMergeModal}
-            className="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm min-w-[130px]"
+            className="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm min-w-[130px] cursor-pointer"
           >
             <GitMerge className="w-4 h-4 text-amber-600" />
             <span>Merge Duplicates</span>
           </button>
           <button
             onClick={onOpenAddCustomer}
-            className="signal-button flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md uppercase tracking-wider font-mono min-w-[130px]"
+            className="signal-button flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md uppercase tracking-wider font-mono min-w-[130px] cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
             <span>Add Customer</span>
@@ -92,56 +135,85 @@ export function CustomersView({
         </div>
       </div>
 
-      {/* Active Yard Filter Notice */}
-      {selectedSite !== 'All Sites' && (
-        <div className="flex items-center justify-between p-3 rounded-xl bg-red-50/80 border border-red-200 text-xs text-red-900 animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#e60012] animate-pulse" />
-            <span>
-              Customer 360 profiles scoped to yard / site: <strong>{selectedSite}</strong>
-            </span>
-          </div>
-          <button
-            onClick={() => setSelectedSite('All Sites')}
-            className="text-[11px] font-semibold text-[#e60012] hover:underline"
-          >
-            Show All Sites
-          </button>
-        </div>
-      )}
-
-
-      {/* Filter Row */}
-      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 w-full">
-          <div className="relative flex-1">
+      {/* Filter Row 1 */}
+      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
               value={searchFilter}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
+              onChange={(e) => handleFilterChange(setSearchFilter, e.target.value)}
               placeholder="Search name, mobile, email, company, ID..."
               className="w-full text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
             />
           </div>
 
           <select
-            value={recordTypeFilter}
-            onChange={(e) => handleFilterChange('recordType', e.target.value)}
-            className="w-full sm:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
+            value={siteFilter}
+            onChange={(e) => handleFilterChange(setSiteFilter, e.target.value)}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
           >
-            <option value="All">All Types</option>
+            {SITES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <select
+            value={recordTypeFilter}
+            onChange={(e) => handleFilterChange(setRecordTypeFilter, e.target.value)}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+          >
+            <option value="All">All Customer Types</option>
             <option value="Individual">Individual Buyers</option>
             <option value="Company">Company / Commercial</option>
             <option value="Fleet">Fleet / Novated</option>
             <option value="Household">Household</option>
           </select>
+
+          <select
+            value={sourceFilter}
+            onChange={(e) => handleFilterChange(setSourceFilter, e.target.value)}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+          >
+            <option value="All">All Lead Sources</option>
+            <option value="Virtual Yard">Virtual Yard</option>
+            <option value="Lead Centre">Lead Centre</option>
+            <option value="Showroom Walk-in">Showroom Walk-in</option>
+            <option value="Website">Official Website</option>
+            <option value="Direct Intake">Direct Intake / BDC</option>
+          </select>
         </div>
 
-        <span className="text-xs font-mono text-slate-500 shrink-0 text-right sm:text-left pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-          Showing <strong className="text-slate-900 font-bold">{customers.length}</strong> of{' '}
-          <strong className="text-slate-900 font-bold">{customersPagination?.total ?? customers.length}</strong> records
-        </span>
+        {/* Secondary Row: Consultant and Clear button */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={consultantFilter}
+              onChange={(e) => handleFilterChange(setConsultantFilter, e.target.value)}
+              className="text-xs p-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+            >
+              <option value="All">All Assigned Consultants</option>
+              <option value="Alex Rivers">Alex Rivers</option>
+              <option value="Sarah Chen">Sarah Chen</option>
+              <option value="Marcus Vance">Marcus Vance</option>
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 font-semibold transition-colors cursor-pointer"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+
+          <span className="font-mono text-slate-500 text-right sm:text-left">
+            Showing <strong className="text-slate-900 font-bold">{customers.length}</strong> of{' '}
+            <strong className="text-slate-900 font-bold">{customersPagination?.total ?? customers.length}</strong> records
+          </span>
+        </div>
       </div>
 
       {/* Directory Table */}

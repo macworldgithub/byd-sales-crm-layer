@@ -39,6 +39,9 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [locationFilter, setLocationFilter] = useState(() => (selectedSite !== 'All Sites' ? selectedSite : 'All Locations'));
+  const [typeFilter, setTypeFilter] = useState('All');
+  const [consultantFilter, setConsultantFilter] = useState('All');
+  const [timeframeFilter, setTimeframeFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
 
@@ -46,22 +49,26 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
   useEffect(() => {
     if (selectedSite && selectedSite !== 'All Sites') {
       setLocationFilter(selectedSite);
-    } else {
-      setLocationFilter('All Locations');
     }
   }, [selectedSite]);
 
-
   // Trigger backend fetch on filter / page change
   const handleFetch = useCallback(() => {
+    const effectiveLoc = locationFilter !== 'All Locations' ? locationFilter : (selectedSite !== 'All Sites' ? selectedSite : undefined);
     fetchAppointments({
       page: currentPage,
       limit: pageSize,
       status: statusFilter !== 'All' ? statusFilter : undefined,
-      location: locationFilter !== 'All Locations' ? locationFilter : undefined,
+      location: effectiveLoc,
+      site: effectiveLoc,
+      yard: effectiveLoc,
+      type: typeFilter !== 'All' ? typeFilter : undefined,
+      consultant: consultantFilter !== 'All' ? consultantFilter : undefined,
+      consultantName: consultantFilter !== 'All' ? consultantFilter : undefined,
+      timeframe: timeframeFilter !== 'All' ? timeframeFilter : undefined,
       q: searchFilter.trim() || undefined,
     });
-  }, [currentPage, statusFilter, locationFilter, searchFilter, fetchAppointments]);
+  }, [currentPage, statusFilter, locationFilter, selectedSite, typeFilter, consultantFilter, timeframeFilter, searchFilter, fetchAppointments]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -69,6 +76,25 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
     }, 250);
     return () => clearTimeout(timer);
   }, [handleFetch]);
+
+  const hasActiveFilters = Boolean(
+    searchFilter.trim() ||
+    statusFilter !== 'All' ||
+    (locationFilter !== 'All Locations' && locationFilter !== selectedSite) ||
+    typeFilter !== 'All' ||
+    consultantFilter !== 'All' ||
+    timeframeFilter !== 'All'
+  );
+
+  const clearAllFilters = () => {
+    setSearchFilter('');
+    setStatusFilter('All');
+    setLocationFilter(selectedSite !== 'All Sites' ? selectedSite : 'All Locations');
+    setTypeFilter('All');
+    setConsultantFilter('All');
+    setTimeframeFilter('All');
+    setCurrentPage(1);
+  };
 
   const displayAppointments = appointments;
   const totalCount = appointmentsPagination?.total ?? displayAppointments.length;
@@ -91,7 +117,7 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
 
         <button
           onClick={onOpenBookDrive}
-          className="signal-button w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md uppercase tracking-wider font-mono"
+          className="signal-button w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md uppercase tracking-wider font-mono cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Book Test Drive</span>
@@ -99,10 +125,10 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 w-full">
+      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
           {/* Search Input */}
-          <div className="relative flex-1">
+          <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
@@ -117,22 +143,36 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
           </div>
 
           {/* Location / Yard Filter */}
-          <div className="relative">
-            <select
-              value={locationFilter}
-              onChange={(e) => {
-                setLocationFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full sm:w-auto text-xs p-2 pr-7 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
-            >
-              {LOCATION_OPTIONS.map((loc) => (
-                <option key={loc} value={loc}>
-                  {loc}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={locationFilter}
+            onChange={(e) => {
+              setLocationFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+          >
+            {LOCATION_OPTIONS.map((loc) => (
+              <option key={loc} value={loc}>
+                {loc}
+              </option>
+            ))}
+          </select>
+
+          {/* Type Filter */}
+          <select
+            value={typeFilter}
+            onChange={(e) => {
+              setTypeFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+          >
+            <option value="All">All Types</option>
+            <option value="Test Drive">Test Drive</option>
+            <option value="Consultation">Showroom Consultation</option>
+            <option value="Handover">Vehicle Handover</option>
+            <option value="Appraisal">Trade-In Appraisal</option>
+          </select>
 
           {/* Status Filter */}
           <select
@@ -141,7 +181,7 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full sm:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
           >
             <option value="All">All Statuses</option>
             <option value="Confirmed">Confirmed</option>
@@ -151,9 +191,53 @@ export function AppointmentsView({ onOpenBookDrive }: AppointmentsViewProps) {
           </select>
         </div>
 
-        <span className="text-xs font-mono text-slate-400 shrink-0 text-right sm:text-left pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-          {totalCount} appointment{totalCount === 1 ? '' : 's'} total
-        </span>
+        {/* Secondary Row: Timeframe, Consultant, and Clear button */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={timeframeFilter}
+              onChange={(e) => {
+                setTimeframeFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="text-xs p-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+            >
+              <option value="All">All Dates</option>
+              <option value="Today">Today</option>
+              <option value="Tomorrow">Tomorrow</option>
+              <option value="This Week">This Week</option>
+              <option value="Upcoming">Upcoming</option>
+            </select>
+
+            <select
+              value={consultantFilter}
+              onChange={(e) => {
+                setConsultantFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="text-xs p-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+            >
+              <option value="All">All Consultants</option>
+              <option value="Alex Rivers">Alex Rivers</option>
+              <option value="Sarah Chen">Sarah Chen</option>
+              <option value="Marcus Vance">Marcus Vance</option>
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 font-semibold transition-colors cursor-pointer"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+
+          <span className="font-mono text-slate-500 text-right sm:text-left">
+            Showing <strong className="text-slate-900 font-bold">{displayAppointments.length}</strong> of{' '}
+            <strong className="text-slate-900 font-bold">{totalCount}</strong> appointments
+          </span>
+        </div>
       </div>
 
       {/* Appointments List Grid */}

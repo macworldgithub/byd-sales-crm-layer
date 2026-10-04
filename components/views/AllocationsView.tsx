@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Plus,
+  Search,
 } from 'lucide-react';
 import { useCrm } from '@/lib/crmContext';
 import { AllocationItem, Customer } from '@/lib/types';
@@ -42,6 +43,11 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
     addToast,
   } = useCrm();
 
+  const [searchFilter, setSearchFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [siteFilter, setSiteFilter] = useState<string>(() => (selectedSite !== 'All Sites' ? selectedSite : 'All Locations'));
+  const [consultantFilter, setConsultantFilter] = useState('All');
+
   const [reassignModalAlloc, setReassignModalAlloc] = useState<AllocationItem | null>(null);
   const [targetConsultant, setTargetConsultant] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,13 +64,59 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
 
   const consultants = ALL_USERS.filter((u) => u.role === 'consultant');
 
+  // Sync siteFilter with global selectedSite
   useEffect(() => {
-    fetchAllocations({
-      page: currentPage,
-      limit: pageSize,
-      site: selectedSite !== 'All Sites' ? selectedSite : undefined,
-    });
-  }, [currentPage, pageSize, selectedSite, fetchAllocations]);
+    if (selectedSite && selectedSite !== 'All Sites') {
+      setSiteFilter(selectedSite);
+    }
+  }, [selectedSite]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const effectiveSite = siteFilter !== 'All Locations' ? siteFilter : (selectedSite !== 'All Sites' ? selectedSite : undefined);
+      fetchAllocations({
+        page: currentPage,
+        limit: pageSize,
+        q: searchFilter.trim() || undefined,
+        status: statusFilter !== 'All' ? statusFilter : undefined,
+        site: effectiveSite,
+        yard: effectiveSite,
+        location: effectiveSite,
+        assigned_to: consultantFilter !== 'All' ? consultantFilter : undefined,
+      });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [currentPage, pageSize, searchFilter, statusFilter, siteFilter, consultantFilter, selectedSite, fetchAllocations]);
+
+  const hasActiveFilters = Boolean(
+    searchFilter.trim() ||
+    statusFilter !== 'All' ||
+    (siteFilter !== 'All Locations' && siteFilter !== selectedSite) ||
+    consultantFilter !== 'All'
+  );
+
+  const clearAllFilters = () => {
+    setSearchFilter('');
+    setStatusFilter('All');
+    setSiteFilter(selectedSite !== 'All Sites' ? selectedSite : 'All Locations');
+    setConsultantFilter('All');
+    setCurrentPage(1);
+  };
+
+  const SITES = [
+    'All Locations',
+    'BYD Nunawading',
+    'BYD Melbourne City',
+    'BYD Fairfield',
+    'BYD Caroline Springs',
+    'BYD Doncaster',
+    'Denza Melbourne',
+    'Holding Yard VIC',
+    'Nunawading',
+    'Fairfield',
+    'Melbourne City',
+    'Caroline Springs',
+  ];
 
   const handleReassignSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,6 +266,80 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
             <CheckCircle2 className="w-5 h-5" />
           </div>
         </div>
+      </div>
+
+      {/* Filter Row */}
+      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchFilter}
+              onChange={(e) => {
+                setSearchFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search prospect, phone, vehicle, ID..."
+              className="w-full text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
+            />
+          </div>
+
+          <select
+            value={siteFilter}
+            onChange={(e) => {
+              setSiteFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+          >
+            {SITES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+          >
+            <option value="All">All Allocation Statuses</option>
+            <option value="pending">Pending First Touch</option>
+            <option value="accepted">Accepted / In Progress</option>
+            <option value="escalated">Escalated (SLA Breached)</option>
+          </select>
+
+          <select
+            value={consultantFilter}
+            onChange={(e) => {
+              setConsultantFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
+          >
+            <option value="All">All Assigned Consultants</option>
+            <option value="Alex Rivers">Alex Rivers</option>
+            <option value="Sarah Chen">Sarah Chen</option>
+            <option value="Marcus Vance">Marcus Vance</option>
+          </select>
+        </div>
+
+        {hasActiveFilters && (
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+            <span className="text-slate-500 font-mono">
+              Active filters applied
+            </span>
+            <button
+              onClick={clearAllFilters}
+              className="px-2.5 py-1 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 font-semibold transition-colors cursor-pointer"
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Allocation Queue */}

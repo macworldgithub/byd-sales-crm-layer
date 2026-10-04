@@ -428,19 +428,14 @@ export function CrmProvider({ children }: { children: ReactNode }) {
 
   // Live Backend Sync on Mount (§7.1, §7.3)
   useEffect(() => {
-    const initSession = async () => {
-      if (!getToken()) {
-        try {
-          await authApi.getDeskSession();
-        } catch {}
-      }
+    if (typeof window !== 'undefined' && getToken()) {
       fetchScoreboards();
-    };
-    initSession();
+    }
   }, [fetchScoreboards]);
 
   // Synchronize collections whenever selectedSite / yard / department changes
   useEffect(() => {
+    if (typeof window === 'undefined' || !getToken()) return;
     const siteParam = selectedSite !== 'All Sites' ? selectedSite : undefined;
     const query = siteParam ? { site: siteParam, yard: siteParam, location: siteParam } : {};
     fetchCustomers({ page: 1, limit: 50, ...query });
