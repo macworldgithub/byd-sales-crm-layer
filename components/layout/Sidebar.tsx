@@ -57,7 +57,7 @@ export function Sidebar({
       badgeColor: 'bg-[#e60012]',
     },
     { id: 'customers', label: 'Customer 360', icon: Users },
-    { id: 'appointments', label: 'Appointments', icon: Calendar },
+    { id: 'calendar', label: 'Calendar', icon: Calendar },
     { id: 'virtual-yard', label: 'Virtual Yard', icon: Car },
     {
       id: 'deliveries',
@@ -130,7 +130,7 @@ export function Sidebar({
           <nav className="space-y-1">
             {mainNav.map((item) => {
               const Icon = item.icon;
-              const isActive = activeTab === item.id;
+              const isActive = activeTab === item.id || (item.id === 'calendar' && activeTab === 'appointments');
               return (
                 <button
                   key={item.id}

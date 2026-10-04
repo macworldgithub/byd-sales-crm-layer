@@ -270,7 +270,7 @@ export function HomeView({
                 </span>
                 <h3 className="section-title text-xl">Today&apos;s Appointments</h3>
               </div>
-              <button onClick={() => onNavigateTab('appointments')} className="text-link">
+              <button onClick={() => onNavigateTab('calendar')} className="text-link">
                 <span>Calendar</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>

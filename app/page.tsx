@@ -205,9 +205,11 @@ export default function SalesCrmApp() {
                 />
               )}
 
-              {activeTab === 'appointments' && (
+              {(activeTab === 'calendar' || activeTab === 'appointments') && (
                 <AppointmentsView
                   onOpenBookDrive={() => setIsBookDriveOpen(true)}
+                  onOpenQuickDeal={() => setIsAddDealOpen(true)}
+                  onSelectCustomer={(cust) => setSelected360Customer(cust)}
                 />
               )}
 
