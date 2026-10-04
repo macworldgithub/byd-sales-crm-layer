@@ -211,7 +211,7 @@ export function CustomersView({
 
           <span className="font-mono text-slate-500 text-right sm:text-left">
             Showing <strong className="text-slate-900 font-bold">{customers.length}</strong> of{' '}
-            <strong className="text-slate-900 font-bold">{customersPagination?.total ?? customers.length}</strong> records
+            <strong className="text-slate-900 font-bold">{customers.length === 0 ? 0 : (customersPagination?.total ?? customers.length)}</strong> records
           </span>
         </div>
       </div>
@@ -232,12 +232,36 @@ export function CustomersView({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {customers.map((cust) => (
-                <tr
-                  key={cust.customer_id}
-                  onClick={() => onSelectCustomer(cust)}
-                  className="hover:bg-slate-50/80 cursor-pointer transition-colors"
-                >
+              {customers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 px-4 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <div className="font-bold text-slate-800 text-sm">No Customer Records Found</div>
+                      <p className="text-xs text-slate-500">
+                        There are currently no customer profiles in the database registered for{' '}
+                        <strong className="text-slate-700">{siteFilter !== 'All Locations' ? siteFilter : selectedSite}</strong>.
+                      </p>
+                      {hasActiveFilters && (
+                        <button
+                          onClick={clearAllFilters}
+                          className="mt-2 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 transition-colors"
+                        >
+                          Clear All Filters
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                customers.map((cust) => (
+                  <tr
+                    key={cust.customer_id}
+                    onClick={() => onSelectCustomer(cust)}
+                    className="hover:bg-slate-50/80 cursor-pointer transition-colors"
+                  >
                   <td className="py-3.5 px-4">
                     <div className="font-bold text-slate-900 text-sm">{cust.name}</div>
                     <div className="text-[11px] font-mono text-slate-400 mt-0.5">
@@ -309,7 +333,7 @@ export function CustomersView({
                     </button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

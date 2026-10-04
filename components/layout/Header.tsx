@@ -488,34 +488,25 @@ export function Header({ onSelectCustomer, onOpenQuickDeal, onToggleMobileMenu }
           </button>
 
           {isUserMenuOpen && (
-            <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-1.5 animate-in fade-in">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 font-mono">
-                Switch Operational Persona
+            <div className="absolute top-full right-0 mt-2 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 animate-in fade-in space-y-2">
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
+                <div className="text-xs font-bold text-slate-900 leading-snug truncate">
+                  {currentUser.name}
+                </div>
+                <div className="text-[11px] text-slate-500 font-mono truncate">
+                  {currentUser.email}
+                </div>
+                <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-200/60 mt-1">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-red-50 text-[#e60012] uppercase tracking-wide">
+                    {currentRole}
+                  </span>
+                  <span className="text-[10px] font-semibold text-slate-600 font-mono truncate">
+                    {selectedSite}
+                  </span>
+                </div>
               </div>
-              {roles.map((r) => (
-                <button
-                  key={r.role}
-                  onClick={() => {
-                    setCurrentRole(r.role);
-                    setIsUserMenuOpen(false);
-                    addToast('info', 'Active Role Changed', `Switched to ${r.title}`);
-                  }}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between ${
-                    currentRole === r.role
-                      ? 'bg-red-50 text-[#e60012] font-bold'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <div>
-                    <div>{r.title}</div>
-                    <span className="text-[10px] text-slate-400 font-mono">{r.badge}</span>
-                  </div>
-                  {currentRole === r.role && (
-                    <span className="w-2 h-2 rounded-full bg-[#e60012]" />
-                  )}
-                </button>
-              ))}
-              <div className="pt-1 mt-1 border-t border-slate-100">
+
+              <div>
                 <button
                   onClick={() => {
                     if (typeof window !== 'undefined') {
@@ -524,10 +515,10 @@ export function Header({ onSelectCustomer, onOpenQuickDeal, onToggleMobileMenu }
                       window.location.reload();
                     }
                   }}
-                  className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center justify-between"
+                  className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center justify-between transition-colors cursor-pointer"
                 >
                   <span>Sign Out</span>
-                  <span className="text-[10px] font-mono">Desk Lock</span>
+                  <span className="text-[10px] font-mono text-red-400">Desk Lock</span>
                 </button>
               </div>
             </div>

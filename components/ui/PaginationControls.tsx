@@ -27,7 +27,7 @@ export function PaginationControls({
   itemLabel = 'items',
   className = '',
 }: PaginationControlsProps) {
-  const total = pagination?.total ?? totalItems;
+  const total = totalItems === 0 ? 0 : (pagination?.total ?? totalItems);
   const page = pagination?.page ?? currentPage;
   const limit = pagination?.limit ?? pageSize;
   const totalPages = pagination?.pages ?? Math.max(1, Math.ceil(total / limit));
@@ -59,7 +59,7 @@ export function PaginationControls({
     return pages;
   };
 
-  if (total === 0) return null;
+  if (total === 0 || totalItems === 0) return null;
 
   return (
     <div
