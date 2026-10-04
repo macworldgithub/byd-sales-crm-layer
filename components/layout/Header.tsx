@@ -35,6 +35,7 @@ export function Header({ onSelectCustomer, onOpenQuickDeal, onToggleMobileMenu }
     currentRole,
     selectedSite,
     setSelectedSite,
+    lockedSite,
     isOnline,
     customers,
     opportunities,
@@ -106,9 +107,10 @@ export function Header({ onSelectCustomer, onOpenQuickDeal, onToggleMobileMenu }
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  const isFilteredSite = Boolean(selectedSite && selectedSite !== 'All Sites' && selectedSite !== 'All');
+  // Locked users can't clear/reset the site filter
+  const isFilteredSite = !lockedSite && Boolean(selectedSite && selectedSite !== 'All Sites' && selectedSite !== 'All');
 
-  const sites: { name: SiteLocation; label: string; desc: string }[] = [
+  const allSites: { name: SiteLocation; label: string; desc: string }[] = [
     { name: 'All Sites', label: 'All Sites & Yards', desc: 'All Dealerships, Yards & Departments' },
     { name: 'BYD Melbourne City', label: 'BYD Melbourne City', desc: 'CBD Flagship Showroom & Delivery' },
     { name: 'BYD Caroline Springs', label: 'BYD Caroline Springs', desc: 'Western Hub Dealership & Yard' },
@@ -118,6 +120,7 @@ export function Header({ onSelectCustomer, onOpenQuickDeal, onToggleMobileMenu }
     { name: 'Holding Yard VIC', label: 'Holding Yard VIC', desc: 'Central Vehicle Logistics & Altona Yard' },
     { name: 'BYD Doncaster', label: 'BYD Doncaster', desc: 'Boutique Showroom & Test Drives' },
   ];
+  const sites = lockedSite ? allSites.filter((s) => s.name === lockedSite) : allSites;
 
 
   const roles: { role: UserRole; title: string; badge: string }[] = [

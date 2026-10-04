@@ -51,6 +51,21 @@ export const clearToken = () => {
   }
 };
 
+/**
+ * Returns the site the logged-in user is locked to ('' if unrestricted).
+ * Read from the JWT purely for UI purposes — the backend enforces the lock itself.
+ */
+export const getLockedSite = (): string => {
+  try {
+    const token = getToken();
+    if (!token) return '';
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload.locked_site || '';
+  } catch {
+    return '';
+  }
+};
+
 export async function fetchApi<T>(
   endpoint: string,
   options: RequestInit = {}

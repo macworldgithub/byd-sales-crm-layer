@@ -31,7 +31,7 @@ import {
   INITIAL_AUDIT_LOG,
   CONSULTANT_SCORES,
 } from './data';
-import { customerApi, opportunityApi, allocationApi, vyApi, syncApi, crmMessageApi, authApi, boardApi, appointmentApi, getToken } from './api';
+import { customerApi, opportunityApi, allocationApi, vyApi, syncApi, crmMessageApi, authApi, boardApi, appointmentApi, getToken, getLockedSite } from './api';
 
 export interface ToastMessage {
   id: string;
@@ -87,6 +87,8 @@ interface CrmContextType {
   setCurrentUser: (user: UserProfile) => void;
   selectedSite: SiteLocation;
   setSelectedSite: (site: SiteLocation) => void;
+  /** Site the logged-in user is restricted to ('' = unrestricted) */
+  lockedSite: string;
   currentRole: UserRole;
   setCurrentRole: (role: UserRole) => void;
   isOnline: boolean;
@@ -194,12 +196,19 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   // Session & Tenancy
   const [currentUser, setCurrentUser] = useState<UserProfile>(CURRENT_USER);
   const [selectedSite, setSelectedSiteState] = useState<SiteLocation>('All Sites');
+  const [lockedSite, setLockedSite] = useState<string>('');
   const [currentRole, setCurrentRole] = useState<UserRole>('super_admin');
   const [isOnline, setIsOnline] = useState(true);
 
-  // Load saved yard/site from localStorage on mount
+  // Load saved yard/site from localStorage on mount (a site-locked login always wins)
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const locked = getLockedSite();
+      setLockedSite(locked);
+      if (locked) {
+        setSelectedSiteState(locked as SiteLocation);
+        return;
+      }
       const saved = localStorage.getItem('byd_crm_site');
       if (saved) {
         setSelectedSiteState(saved as SiteLocation);
@@ -208,6 +217,13 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setSelectedSite = useCallback((site: SiteLocation) => {
+    // Re-read the lock from the token so a fresh login is honoured immediately
+    const locked = getLockedSite();
+    setLockedSite(locked);
+    if (locked) {
+      setSelectedSiteState(locked as SiteLocation);
+      return;
+    }
     setSelectedSiteState(site);
     if (typeof window !== 'undefined') {
       localStorage.setItem('byd_crm_site', site);
@@ -1489,7 +1505,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   );
 
   const filteredAllocations = allocations.filter((a) =>
-    matchesSite(a.site || a.yard || (a as any).dealer || a.department, selectedSite)
+    matchesSite(a.site || (a as any).yard || (a as any).dealer || (a as any).department, selectedSite)
   );
 
   const filteredSalesLog = salesLog.filter((s) =>
@@ -1518,6 +1534,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         setCurrentUser,
         selectedSite,
         setSelectedSite,
+        lockedSite,
         currentRole,
         setCurrentRole: handleSetRole,
         isOnline,
