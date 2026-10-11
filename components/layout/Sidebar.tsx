@@ -15,6 +15,7 @@ import {
   Settings,
   Sparkles,
   FileSpreadsheet,
+  UserCheck,
 } from 'lucide-react';
 import { ASSET_PATHS } from '@/lib/data';
 import { useCrm } from '@/lib/crmContext';
@@ -67,6 +68,7 @@ export function Sidebar({
       badgeColor: 'bg-emerald-600',
     },
     { id: 'sales-log', label: 'Sales Log', icon: BookOpen },
+    { id: 'staff', label: 'Staff', icon: UserCheck },
   ];
 
   const managerNav = [

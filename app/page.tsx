@@ -17,6 +17,7 @@ import { AuditView } from '@/components/views/AuditView';
 import { ReportsView } from '@/components/views/ReportsView';
 import { SettingsView } from '@/components/views/SettingsView';
 import { InboundQueueView } from '@/components/views/InboundQueueView';
+import { StaffView } from '@/components/views/StaffView';
 import { Customer360Modal } from '@/components/modals/Customer360Modal';
 import { MarkSoldModal } from '@/components/modals/MarkSoldModal';
 import { AddDealModal } from '@/components/modals/AddDealModal';
@@ -218,6 +219,8 @@ export default function SalesCrmApp() {
               {activeTab === 'deliveries' && <DeliveriesView />}
 
               {activeTab === 'sales-log' && <SalesLogView />}
+
+              {activeTab === 'staff' && <StaffView />}
 
               {activeTab === 'inbound-queue' && <InboundQueueView />}
 

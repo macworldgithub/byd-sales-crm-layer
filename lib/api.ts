@@ -411,3 +411,48 @@ export const boardApi = {
     fetchApi<any>('/crm/targets', { method: 'POST', body: JSON.stringify(payload) }),
 };
 
+// ─── Staff Directory API ───────────────────────────────────────────────────
+export interface StaffMember {
+  id?: string;
+  _id?: string;
+  name: string;
+  email: string;
+  role: string;
+  site?: string;
+  locked_site?: string;
+  active: boolean;
+  phone?: string;
+  position?: string;
+  avatar?: string;
+  department?: string;
+  team?: string;
+  createdAt?: string;
+}
+
+export interface StaffResponse {
+  success: boolean;
+  data: StaffMember[];
+  total: number;
+  userScope: {
+    hasFullAccess: boolean;
+    userSite: string;
+  };
+  availableSites: string[];
+}
+
+export const staffApi = {
+  getStaff: async (site?: string, search?: string) => {
+    const params = new URLSearchParams();
+    if (site && site !== 'All' && site !== 'All Sites' && site !== 'All Locations') {
+      params.set('site', site);
+    }
+    if (search) {
+      params.set('q', search);
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetchApi<any>(`/staff${query}`);
+    return res as unknown as StaffResponse;
+  },
+};
+
+
