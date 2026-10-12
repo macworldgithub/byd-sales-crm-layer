@@ -70,7 +70,11 @@ export function Customer360Modal({
 
   useEffect(() => {
     if (customer?.customer_id && customer.customer_id !== 'undefined') {
-      fetchCustomerTimeline(customer.customer_id);
+      const refresh = () => { if (document.visibilityState === 'visible') fetchCustomerTimeline(customer.customer_id); };
+      refresh();
+      const timer = window.setInterval(refresh, 5000);
+      window.addEventListener('focus', refresh);
+      return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); };
     }
   }, [customer?.customer_id]);
 
@@ -244,7 +248,8 @@ export function Customer360Modal({
   const handleSendSmsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSms.trim()) return;
-    await sendSmsMessage(customer.customer_id, customer.phone, newSms.trim());
+    const sent = await sendSmsMessage(customer.customer_id, customer.phone, newSms.trim());
+    if (!sent) return;
     setNewSms('');
   };
 

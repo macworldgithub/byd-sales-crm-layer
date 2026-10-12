@@ -767,13 +767,11 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   // Fetch Customer Timeline from MongoDB (§5.2)
   const fetchCustomerTimeline = async (customerId: string) => {
     try {
-      const res = await customerApi.getTimeline(customerId);
-      if (res.success && res.data && res.data.length > 0) {
-        setTimelineEvents((prev) => {
-          const existingIds = new Set(prev.map((e) => e.event_id));
-          const newEvents = res.data!.filter((e) => !existingIds.has(e.event_id));
-          return [...newEvents, ...prev];
-        });
+      const res = await customerApi.getTimeline(customerId, { paginate: "false" });
+      if (res.success && res.data) {
+        setTimelineEvents((prev) => [
+          ...res.data!, ...prev.filter(e => e.customer_id !== customerId),
+        ]);
       }
     } catch (err) {
       console.warn('fetchCustomerTimeline error:', err);
@@ -1475,20 +1473,11 @@ export function CrmProvider({ children }: { children: ReactNode }) {
       await crmMessageApi.sendSms({ phone, body: message, customerId });
     } catch (err) {
       console.warn('sendSmsMessage api error:', err);
+      addToast('error', 'SMS failed', 'The message could not be sent.');
+      return false;
     }
 
-    const smsEvt: TimelineEvent = {
-      event_id: `EVT-${Date.now().toString().slice(-4)}`,
-      customer_id: customerId,
-      occurred_at: 'Just now (AEST)',
-      source: 'Sales CRM',
-      type: 'sms_out',
-      author: currentUser.name,
-      title: `Outbound SMS to ${phone}`,
-      content: message,
-      visibility: 'customer-facing',
-    };
-    setTimelineEvents((prev) => [smsEvt, ...prev]);
+    await fetchCustomerTimeline(customerId);
 
     addToast('success', 'SMS Outbound Dispatched', `Message sent to ${phone} via MobileMessage gateway.`);
     return true;
