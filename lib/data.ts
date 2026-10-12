@@ -578,7 +578,7 @@ export const INITIAL_TIMELINE_EVENTS: TimelineEvent[] = [
     occurred_at: 'Yesterday at 4:50 PM AEST',
     source: 'Lead Centre',
     type: 'assignment',
-    author: 'Lead Centre AI / BDC',
+    author: 'Lead Centre / BDC',
     title: 'Lead Allocated to Fairfield Sales Desk',
     content: 'Prospect qualified via two-way SMS with intent score 86/100. Allocated to consultant Alex Rivers with 15-minute SLA.',
     visibility: 'internal',

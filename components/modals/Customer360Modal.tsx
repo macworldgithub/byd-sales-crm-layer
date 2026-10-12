@@ -95,7 +95,6 @@ export function Customer360Modal({
   const [newNote, setNewNote] = useState('');
   const [newSms, setNewSms] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
-  const [isAiPaused, setIsAiPaused] = useState(true);
 
   // Phone Call Logger state (§5.9)
   const [isCallLoggerOpen, setIsCallLoggerOpen] = useState(false);
@@ -826,7 +825,7 @@ export function Customer360Modal({
           {/* 5. MESSAGES & SMS TAB (§5.9) */}
           {activeTab === 'messages' && (
             <div className="space-y-5 max-w-3xl mx-auto">
-              {/* AI Handover Control & ACMA Consent State */}
+              {/* Manual SMS & Consent State */}
               <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
                 <div>
                   <span className="text-xs font-bold text-slate-900 block">
@@ -836,19 +835,7 @@ export function Customer360Modal({
                     Consent active since {new Date(customer.consent_updated_at).toLocaleDateString()} · ACMA compliant
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-600 font-medium">Lead Centre AI:</span>
-                  <button
-                    onClick={() => setIsAiPaused(!isAiPaused)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-colors ${
-                      isAiPaused
-                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                        : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                    }`}
-                  >
-                    {isAiPaused ? 'Paused (Human Control)' : 'AI Active'}
-                  </button>
-                </div>
+                <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">Manual SMS · Staff sends each message</span>
               </div>
 
               {/* Template Picker */}
@@ -893,7 +880,7 @@ export function Customer360Modal({
                     <div>
                       <strong className="block font-bold">ACMA Compliance Block Active (§5.10 & AC-5)</strong>
                       <p className="text-[11px] text-red-800 leading-relaxed mt-0.5">
-                        This customer has opted out of SMS contact under the ACMA Spam Act. All outbound CRM SMS and automated Lead Centre AI messages are blocked.
+                        This customer has opted out of SMS contact under the ACMA Spam Act. Outbound SMS is blocked across all platforms.
                       </p>
                     </div>
                   </div>

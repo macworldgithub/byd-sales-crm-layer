@@ -113,7 +113,7 @@ export function AuditView() {
               {optOutCount} customers
             </div>
             <span className="text-[11px] text-slate-500 mt-0.5 block">
-              Auto-halted in Lead Centre AI & CRM SMS
+              SMS blocked in Lead Centre & CRM
             </span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">

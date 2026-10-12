@@ -162,7 +162,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
           </span>
           <h1 className="page-title mt-1">Allocation Inbox & SLA Queue</h1>
           <p className="page-subtitle">
-            Pre-qualified inbound prospects pushed from Lead Centre AI and BDC. 15-minute response SLA clock starts on allocation to stop lead decay.
+            Pre-qualified inbound prospects pushed from Lead Centre and BDC. 15-minute response SLA clock starts on allocation to stop lead decay.
           </p>
         </div>
 
@@ -377,7 +377,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                       {alloc.allocation_id}
                     </span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 text-[#e60012] font-mono">
-                      AI Intent: {alloc.ai_score}/100
+                      Qualification Score: {alloc.ai_score}/100
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">
                       Source: {alloc.source}

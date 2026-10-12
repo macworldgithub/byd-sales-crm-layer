@@ -676,7 +676,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
       type: 'system',
       author: currentUser.name,
       title: `ACMA Compliance: Contact Status changed to ${newStatus}`,
-      content: `Global opt-out synchronized across Lead Centre AI and Delivery Centre. CRM SMS and automated outbound disabled.`,
+      content: `Global opt-out synchronized across Lead Centre and Delivery Centre. Outbound SMS disabled.`,
       visibility: 'internal',
     };
     setTimelineEvents((prev) => [optOutEvent, ...prev]);
@@ -684,7 +684,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     addToast(
       'warning',
       'ACMA Compliance Event Logged',
-      `Customer marked as ${newStatus}. Synced to upstream Lead Centre AI.`
+      `Customer marked as ${newStatus}. Synced to upstream Lead Centre.`
     );
   };
 
