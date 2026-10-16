@@ -451,6 +451,7 @@ export const staffApi = {
     }
     const query = params.toString() ? `?${params.toString()}` : '';
     const res = await fetchApi<any>(`/staff${query}`);
+    if (!res.success || !Array.isArray(res.data)) throw new Error(res.message || 'Unable to load staff');
     return res as unknown as StaffResponse;
   },
 };

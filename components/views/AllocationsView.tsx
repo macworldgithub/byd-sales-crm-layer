@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useCrm } from '@/lib/crmContext';
 import { AllocationItem, Customer } from '@/lib/types';
-import { ALL_USERS } from '@/lib/data';
+import { staffApi, StaffMember, getLockedSite } from '@/lib/api';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 
 interface AllocationsViewProps {
@@ -55,14 +55,29 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
 
   // Direct Intake Modal State
   const [showIntakeModal, setShowIntakeModal] = useState(false);
+  const defaultIntakeSite = getLockedSite() || (currentUser.site !== 'All Sites' ? currentUser.site : '') || 'BYD Nunawading';
+  const [intakeSite, setIntakeSite] = useState<string>(defaultIntakeSite);
   const [intakeName, setIntakeName] = useState('');
   const [intakePhone, setIntakePhone] = useState('');
   const [intakeEmail, setIntakeEmail] = useState('');
   const [intakeVehicle, setIntakeVehicle] = useState('BYD Seal');
-  const [intakeConsultant, setIntakeConsultant] = useState(currentUser.name);
+  const [intakeConsultant, setIntakeConsultant] = useState('');
   const [isSubmittingIntake, setIsSubmittingIntake] = useState(false);
 
-  const consultants = ALL_USERS.filter((u) => u.role === 'consultant');
+  const [consultants, setConsultants] = useState<StaffMember[]>([]);
+  const [staffError, setStaffError] = useState('');
+  const assignmentSite = reassignModalAlloc?.site || (showIntakeModal ? intakeSite : siteFilter !== 'All Locations' ? siteFilter : selectedSite);
+  useEffect(() => {
+    let cancelled = false;
+    setConsultants([]);
+    setTargetConsultant('');
+    setIntakeConsultant('');
+    setStaffError('');
+    staffApi.getStaff(assignmentSite).then((res) => {
+      if (!cancelled) setConsultants(res.data);
+    }).catch(() => { if (!cancelled) setStaffError('Unable to load site staff. Please try again.'); });
+    return () => { cancelled = true; };
+  }, [assignmentSite]);
 
   // Sync siteFilter with global selectedSite
   useEffect(() => {
@@ -120,14 +135,14 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
 
   const handleReassignSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reassignModalAlloc || !targetConsultant) return;
+    if (!reassignModalAlloc || !consultants.some(c => c.name === targetConsultant)) return;
     reassignAllocation(reassignModalAlloc.allocation_id, targetConsultant);
     setReassignModalAlloc(null);
   };
 
   const handleDirectIntakeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!intakeName || !intakePhone) return;
+    if (!intakeName || !intakePhone || !consultants.some(c => c.name === intakeConsultant)) return;
     setIsSubmittingIntake(true);
     try {
       await createAllocation({
@@ -136,8 +151,8 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
         phone: intakePhone,
         email: intakeEmail,
         vehicle: intakeVehicle,
-        assigned_to: intakeConsultant || currentUser.name,
-        dealership: selectedSite !== 'All Sites' ? selectedSite : currentUser.site,
+        assigned_to: intakeConsultant,
+        dealership: intakeSite,
         source: 'Direct Intake / BDC Push',
         intent_summary: `Direct walk-in / BDC intake inquiry for ${intakeVehicle}. Immediate contact requested.`,
         urgency: 'high',
@@ -168,7 +183,10 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
-            onClick={() => setShowIntakeModal(true)}
+            onClick={() => {
+              setIntakeSite(getLockedSite() || (siteFilter !== 'All Locations' ? siteFilter : selectedSite !== 'All Sites' ? selectedSite : defaultIntakeSite));
+              setShowIntakeModal(true);
+            }}
             className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 shadow-sm uppercase tracking-wider font-mono"
           >
             <Plus className="w-4 h-4 text-[#e60012]" />
@@ -184,6 +202,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
         </div>
       </div>
 
+      {staffError && <p role="alert" className="text-sm text-red-700">{staffError}</p>}
       {/* Active Yard Filter Notice */}
       {selectedSite !== 'All Sites' && (
         <div className="flex items-center justify-between p-3 rounded-xl bg-red-50/80 border border-red-200 text-xs text-red-900 animate-in fade-in">
@@ -321,9 +340,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
             className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
           >
             <option value="All">All Assigned Consultants</option>
-            <option value="Alex Rivers">Alex Rivers</option>
-            <option value="Sarah Chen">Sarah Chen</option>
-            <option value="Marcus Vance">Marcus Vance</option>
+            {consultants.map(c => <option key={c.email} value={c.name}>{c.name}</option>)}
           </select>
         </div>
 
@@ -523,8 +540,9 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                   onChange={(e) => setTargetConsultant(e.target.value)}
                   className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
                 >
+                  <option value="">Select staff member</option>
                   {consultants.map((c) => (
-                    <option key={c.id} value={c.name}>
+                    <option key={c.email} value={c.name}>
                       {c.name} ({c.site})
                     </option>
                   ))}
@@ -540,6 +558,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                 </button>
                 <button
                   type="submit"
+                  disabled={!targetConsultant}
                   className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs font-mono uppercase"
                 >
                   Confirm Route
@@ -570,6 +589,13 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
             </div>
 
             <form onSubmit={handleDirectIntakeSubmit} className="space-y-4">
+              <label className="block text-xs font-semibold text-slate-700">
+                Site
+                <select value={intakeSite} disabled={Boolean(getLockedSite())} onChange={e => setIntakeSite(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5">
+                  {Array.from(new Set([intakeSite, ...SITES.filter(site => !['All Locations', 'All Sites'].includes(site))])).map(site => <option key={site} value={site}>{site}</option>)}
+                </select>
+              </label>
+              {staffError && <p role="alert" className="text-sm text-red-700">{staffError}</p>}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Customer Full Name *
@@ -639,8 +665,9 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                     onChange={(e) => setIntakeConsultant(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
                   >
+                    <option value="">Select staff member</option>
                     {consultants.map((c) => (
-                      <option key={c.id} value={c.name}>
+                      <option key={c.email} value={c.name}>
                         {c.name} ({c.site})
                       </option>
                     ))}
@@ -664,7 +691,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmittingIntake}
+                  disabled={isSubmittingIntake || !intakeConsultant}
                   className="px-4 py-2 rounded-xl bg-[#e60012] hover:bg-[#c40010] text-white font-bold text-xs font-mono uppercase tracking-wider shadow-sm flex items-center gap-1.5"
                 >
                   {isSubmittingIntake ? 'Allocating...' : 'Push to Sales Floor'}
