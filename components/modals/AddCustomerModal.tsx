@@ -192,6 +192,7 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
                 <option value="Doncaster">Doncaster</option>
                 <option value="Nunawading">Nunawading</option>
                 <option value="Caroline Springs">Caroline Springs</option>
+                <option value="Denza Melbourne">Denza Melbourne</option>
               </select>
             </div>
           </div>
