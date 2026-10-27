@@ -31,11 +31,12 @@ export function LoginView({ onSuccess }: LoginViewProps) {
           localStorage.setItem('byd_crm_auth', 'true');
         }
         const u = res.data.user || {};
+        const role = ({ sales_manager: 'manager', sales_consultant: 'consultant', agent: 'consultant', admin: 'site_admin', delivery_consultant: 'delivery' } as Record<string, string>)[u.role] || u.role;
         setCurrentUser({
           id: u.id || u._id || 'usr-001',
           name: u.name || 'Sales Consultant',
           email: u.email || creds.email,
-          role: u.role || 'sales_consultant',
+          role: role || 'consultant',
           site: u.site || 'Fairfield',
           team: u.team || 'Sales Floor',
           avatarInitials: (u.name || 'SC')
@@ -44,9 +45,11 @@ export function LoginView({ onSuccess }: LoginViewProps) {
             .join('')
             .slice(0, 2)
             .toUpperCase(),
+          allowed_sites: u.allowed_sites,
+          all_sites: u.all_sites,
         });
-        if (u.role) setCurrentRole(u.role);
-        if (u.site) setSelectedSite(u.site);
+        if (role) setCurrentRole(role);
+        setSelectedSite(u.site || (u.allowed_sites && !u.all_sites ? u.allowed_sites[0] : 'All Sites'));
         addToast('success', 'Authenticated Successfully', `Welcome, ${u.name || 'Consultant'}.`);
         if (onSuccess) onSuccess();
       } else {

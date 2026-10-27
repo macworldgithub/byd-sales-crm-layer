@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { ASSET_PATHS } from '@/lib/data';
 import { useCrm } from '@/lib/crmContext';
+import { canManageUsers } from '@/components/views/UserManagementView';
 
 interface SidebarProps {
   activeTab: string;
@@ -35,7 +36,7 @@ export function Sidebar({
   isMobileOpen = false,
   onCloseMobile,
 }: SidebarProps) {
-  const { currentRole, allocations, opportunities, deliveryWatch, selectedSite } = useCrm();
+  const { currentRole, currentUser, allocations, opportunities, deliveryWatch, selectedSite } = useCrm();
 
   const pendingAllocationsCount = allocations.filter((a) => a.status === 'pending' || a.status === 'escalated').length;
   const overdueDealsCount = opportunities.filter((o) => o.is_overdue).length;
@@ -72,6 +73,7 @@ export function Sidebar({
   ];
 
   const managerNav = [
+    ...(canManageUsers(currentUser) ? [{ id: 'users', label: 'Users & Access', icon: Users }] : []),
     { id: 'inbound-queue', label: 'Inbound Queue', icon: Inbox },
     { id: 'team', label: 'Team & Targets', icon: BarChart3 },
     { id: 'reports', label: 'Reports & Exports', icon: FileSpreadsheet },

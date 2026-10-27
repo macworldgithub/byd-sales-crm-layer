@@ -31,6 +31,8 @@ export interface UserProfile {
   site: SiteLocation;
   team: string;
   avatarInitials: string;
+  allowed_sites?: string[];
+  all_sites?: boolean;
 }
 
 export type CustomerRecordType = 'Individual' | 'Company' | 'Fleet' | 'Household';

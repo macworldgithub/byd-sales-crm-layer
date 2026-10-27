@@ -120,7 +120,8 @@ export function Header({ onSelectCustomer, onOpenQuickDeal, onToggleMobileMenu }
     { name: 'Holding Yard VIC', label: 'Holding Yard VIC', desc: 'Central Vehicle Logistics & Altona Yard' },
     { name: 'BYD Doncaster', label: 'BYD Doncaster', desc: 'Boutique Showroom & Test Drives' },
   ];
-  const sites = lockedSite ? allSites.filter((s) => s.name === lockedSite) : allSites;
+  const sites = lockedSite ? allSites.filter((s) => s.name === lockedSite)
+    : currentUser.allowed_sites && !currentUser.all_sites ? currentUser.allowed_sites.map(name => ({ name, label: name, desc: 'Assigned site' })) : allSites;
 
 
   const roles: { role: UserRole; title: string; badge: string }[] = [

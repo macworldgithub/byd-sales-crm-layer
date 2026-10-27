@@ -18,6 +18,7 @@ import { ReportsView } from '@/components/views/ReportsView';
 import { SettingsView } from '@/components/views/SettingsView';
 import { InboundQueueView } from '@/components/views/InboundQueueView';
 import { StaffView } from '@/components/views/StaffView';
+import { UserManagementView } from '@/components/views/UserManagementView';
 import { Customer360Modal } from '@/components/modals/Customer360Modal';
 import { MarkSoldModal } from '@/components/modals/MarkSoldModal';
 import { AddDealModal } from '@/components/modals/AddDealModal';
@@ -38,7 +39,7 @@ import {
 } from 'lucide-react';
 
 export default function SalesCrmApp() {
-  const { toasts, removeToast, allocations, opportunities, customers } = useCrm();
+  const { toasts, removeToast, allocations, opportunities, customers, setCurrentUser, setCurrentRole, setSelectedSite } = useCrm();
 
   // Auth gate state (§8.1)
   const [mounted, setMounted] = useState<boolean>(false);
@@ -61,6 +62,12 @@ export default function SalesCrmApp() {
         .getMe()
         .then((res) => {
           if (res.success && res.data) {
+            const u = res.data;
+            const role = ({ sales_manager: 'manager', sales_consultant: 'consultant', agent: 'consultant', admin: 'site_admin', delivery_consultant: 'delivery' } as Record<string, string>)[u.role] || u.role;
+            setCurrentRole(role);
+            setCurrentUser({ id: u._id || u.id, email: u.email, name: u.name, role, site: u.site || 'All Sites', team: u.team || 'Sales Floor',
+              avatarInitials: u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase(), allowed_sites: u.allowed_sites, all_sites: u.all_sites });
+            if (u.allowed_sites && !u.all_sites) setSelectedSite(u.site || u.allowed_sites[0]);
             setIsAuthenticated(true);
           } else {
             clearToken();
@@ -221,6 +228,7 @@ export default function SalesCrmApp() {
               {activeTab === 'sales-log' && <SalesLogView />}
 
               {activeTab === 'staff' && <StaffView />}
+              {activeTab === 'users' && <UserManagementView />}
 
               {activeTab === 'inbound-queue' && <InboundQueueView />}
 

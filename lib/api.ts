@@ -89,6 +89,10 @@ export async function fetchApi<T>(
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
     }
+    if (typeof window !== 'undefined') {
+      const site = localStorage.getItem('byd_crm_site');
+      if (site) headers.set('X-Site', site);
+    }
 
     const baseUrl = getBaseUrl();
     const response = await fetch(`${baseUrl}${endpoint}`, {
@@ -348,7 +352,7 @@ export const authApi = {
   login: async (credentials: { email: string; password: string }) => {
     const res = await fetchApi<{ access_token: string; user: any; must_change_password?: boolean }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify(credentials),
+      body: JSON.stringify({ ...credentials, platform: 'crm' }),
     });
     if (res.success && res.data?.access_token) {
       setToken(res.data.access_token);
@@ -370,6 +374,21 @@ export const authApi = {
     }
     return res;
   },
+};
+
+export interface ManagedUser {
+  id: string; name: string; email: string; role: string; site: string;
+  all_sites: boolean; allowed_sites: string[]; platform_access: string[];
+  network_lookup: boolean; active: boolean; deleted: boolean; protected: boolean;
+  last_login_at: string | null;
+}
+export interface UserAccessOptions { users: ManagedUser[]; sites: string[]; platforms: string[]; roles: string[] }
+export type ManagedUserInput = Pick<ManagedUser, 'name' | 'email' | 'role' | 'site' | 'all_sites' | 'allowed_sites' | 'platform_access' | 'network_lookup' | 'active'> & { password?: string };
+export const userManagementApi = {
+  list: () => fetchApi<UserAccessOptions>('/admin/users'),
+  create: (input: ManagedUserInput) => fetchApi<ManagedUser>('/admin/users', { method: 'POST', body: JSON.stringify(input) }),
+  update: (id: string, input: ManagedUserInput) => fetchApi<ManagedUser>(`/admin/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  remove: (id: string) => fetchApi<{ deleted: boolean }>(`/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
 
 // ─── Appointments & Test Drives API ─────────────────────────────────────────

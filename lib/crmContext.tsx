@@ -403,13 +403,6 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   // Keep currentUser role and currentRole synchronized
   const handleSetRole = (role: UserRole) => {
     setCurrentRole(role);
-    const matched = ALL_USERS.find((u) => u.role === role);
-    if (matched) {
-      setCurrentUser(matched);
-      if (role !== 'super_admin' && role !== 'bdc') {
-        setSelectedSite(matched.site);
-      }
-    }
   };
 
   const [boardMe, setBoardMe] = useState<any>(null);
