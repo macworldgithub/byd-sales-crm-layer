@@ -78,6 +78,7 @@ export async function fetchApi<T>(
   limit?: number;
   totalPages?: number;
   pagination?: PaginationMeta;
+  hasMore?: boolean;
   message?: string;
   existingCustomer?: any;
 }> {
@@ -413,8 +414,8 @@ export interface VirtualyardOption { id: string; name: string; locationId?: stri
 export interface VirtualyardOptions { yards: VirtualyardOption[]; statuses: VirtualyardOption[]; bookingTypes: VirtualyardOption[] }
 export interface VirtualyardSessionStatus { configured: boolean; connected: boolean; lastCheckedAt: string | null; message: string }
 export const virtualyardApi = {
-  options: () => fetchApi<VirtualyardOptions>('/virtualyard/options'),
-  lookup: (kind: 'vehicles' | 'users' | 'customers', q = '') => fetchApi<VirtualyardOption[]>(`/virtualyard/lookup/${kind}${buildQueryString({ q })}`),
+  options: () => fetchApi<VirtualyardOptions>('/virtualyard/options', { cache: 'no-store' }),
+  lookup: (kind: 'vehicles' | 'users' | 'customers', q = '', limit = 1000, signal?: AbortSignal) => fetchApi<VirtualyardOption[]>(`/virtualyard/lookup/${kind}${buildQueryString({ q, limit })}`, { cache: 'no-store', signal }),
   session: () => fetchApi<VirtualyardSessionStatus>('/virtualyard/session'),
   connect: (cookie: string) => fetchApi<VirtualyardSessionStatus>('/virtualyard/session', { method: 'POST', body: JSON.stringify({ cookie }) }),
 };
