@@ -173,7 +173,7 @@ interface CrmContextType {
   requestDeliveryDateChange: (clientId: string, requestedDate: string, reason: string) => Promise<void>;
 
   // Actions: Appointments & Targets (§5.5, §5.9)
-  createAppointment: (appt: Partial<Appointment>) => void;
+  createAppointment: (appt: Partial<Appointment>) => Promise<Appointment>;
   updateConsultantTarget: (consultantName: string, newTarget: number) => void;
 
   // Scoreboards & Monthly Quotas
@@ -355,6 +355,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
           site: (a.site || a.dealership || a.location || 'Fairfield') as SiteLocation,
           status: a.status || 'Confirmed',
           notes: a.notes || '',
+          virtualyardSync: a.virtualyardSync,
         }));
         setAppointments(mapped);
         if (res.pagination) setAppointmentsPagination(res.pagination);
@@ -1385,16 +1386,18 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   const createAppointment = async (appt: Partial<Appointment>) => {
     const siteVal = (appt.site || (selectedSite !== 'All Sites' ? selectedSite : 'Fairfield')) as SiteLocation;
     const newApptData = {
-      customer_id: appt.customer_id || 'CUST-0891',
+      bookingRequestId: appt.bookingRequestId,
+      virtualyard: appt.virtualyard,
+      customer_id: appt.customer_id || '',
       customer_name: appt.customer_name || 'Customer',
       prospectName: appt.customer_name || 'Customer',
-      phone: appt.phone || '+61400000000',
+      phone: appt.phone || '',
       type: appt.type || 'Test Drive',
       when: appt.when || new Date().toISOString(),
       durationMinutes: appt.duration_minutes || 45,
       vehicle: appt.vehicle || 'BYD SEALION 7',
       loop: appt.loop || 'CBD Demo Loop',
-      consultantName: currentUser.name,
+      consultantName: appt.consultant || currentUser.name,
       site: siteVal,
       dealership: siteVal,
       status: appt.status || 'Confirmed',
@@ -1419,6 +1422,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
 
     try {
       const res = await appointmentApi.createAppointment(newApptData);
+      if (!res.success || !res.data) throw new Error(res.message || 'The appointment could not be saved.');
       if (res.success && res.data) {
         const a = res.data;
         createdAppt = {
@@ -1435,10 +1439,12 @@ export function CrmProvider({ children }: { children: ReactNode }) {
           site: (a.site || siteVal) as SiteLocation,
           status: a.status || 'Confirmed',
           notes: a.notes || newApptData.notes,
+          virtualyardSync: a.virtualyardSync,
         };
       }
     } catch (err) {
-      console.warn('createAppointment API error, using local state fallback:', err);
+      addToast('error', 'Booking failed', err instanceof Error ? err.message : 'The appointment could not be saved.');
+      throw err;
     }
 
     setAppointments((prev) => [createdAppt, ...prev]);
@@ -1457,7 +1463,14 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     };
     setTimelineEvents((prev) => [evt, ...prev]);
 
-    addToast('success', 'Appointment Scheduled', `${createdAppt.type} confirmed with ${createdAppt.customer_name}.`);
+    if (createdAppt.virtualyardSync?.state === 'synced') {
+      addToast('success', 'Test Drive Booked', `Saved in CRM and Virtual Yard (#${createdAppt.virtualyardSync.externalId}).`);
+    } else if (createdAppt.type === 'Test Drive') {
+      addToast('warning', 'Saved in CRM; Virtual Yard needs attention', createdAppt.virtualyardSync?.message || 'Check the appointment sync status before retrying.');
+    } else {
+      addToast('success', 'Appointment Scheduled', `${createdAppt.type} confirmed with ${createdAppt.customer_name}.`);
+    }
+    return createdAppt;
   };
 
   // SMS Send (§5.9)

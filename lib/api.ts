@@ -393,6 +393,7 @@ export const userManagementApi = {
 
 // ─── Appointments & Test Drives API ─────────────────────────────────────────
 export const appointmentApi = {
+  retryVirtualyard: (id: string) => fetchApi<any>(`/crm/appointments/${encodeURIComponent(id)}/virtualyard-retry`, { method: 'POST' }),
   getAppointments: (params?: Record<string, string | number | boolean | undefined>) =>
     fetchApi<any[]>(`/crm/appointments${buildQueryString(params)}`),
   createAppointment: (payload: Record<string, any>) =>
@@ -408,6 +409,16 @@ export const appointmentApi = {
 };
 
 // ─── Inbound Exceptions & Sync Queue API ────────────────────────────────────
+export interface VirtualyardOption { id: string; name: string; locationId?: string; registration?: string; phone?: string }
+export interface VirtualyardOptions { yards: VirtualyardOption[]; statuses: VirtualyardOption[]; bookingTypes: VirtualyardOption[] }
+export interface VirtualyardSessionStatus { configured: boolean; connected: boolean; lastCheckedAt: string | null; message: string }
+export const virtualyardApi = {
+  options: () => fetchApi<VirtualyardOptions>('/virtualyard/options'),
+  lookup: (kind: 'vehicles' | 'users' | 'customers', q = '') => fetchApi<VirtualyardOption[]>(`/virtualyard/lookup/${kind}${buildQueryString({ q })}`),
+  session: () => fetchApi<VirtualyardSessionStatus>('/virtualyard/session'),
+  connect: (cookie: string) => fetchApi<VirtualyardSessionStatus>('/virtualyard/session', { method: 'POST', body: JSON.stringify({ cookie }) }),
+};
+
 export const inboundQueueApi = {
   getSyncPending: (params?: Record<string, string | number | boolean | undefined>) =>
     fetchApi<{

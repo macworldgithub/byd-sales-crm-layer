@@ -27,6 +27,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { useCrm } from '@/lib/crmContext';
+import { VirtualyardSyncStatus } from '@/components/VirtualyardSyncStatus';
 import { Appointment, Opportunity, DeliveryHandoverWatch, Customer, SiteLocation } from '@/lib/types';
 
 export type CalendarEventType = 'drive' | 'followup' | 'delivery' | 'hold';
@@ -99,14 +100,9 @@ export function CalendarView({
   // Navigation & View Mode
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'list'>('month');
   
-  // Date Cursor (defaulting around late September 2026 where CRM dataset is situated, or current date)
-  const [currentDate, setCurrentDate] = useState(() => {
-    // If we have appointments, anchor to their month, otherwise current date
-    const firstDate = appointments[0]?.when ? new Date(appointments[0].when) : new Date(2026, 8, 23);
-    return isNaN(firstDate.getTime()) ? new Date() : firstDate;
-  });
+  const [currentDate, setCurrentDate] = useState(() => new Date());
 
-  const [selectedDayDate, setSelectedDayDate] = useState<Date>(() => new Date(2026, 8, 23));
+  const [selectedDayDate, setSelectedDayDate] = useState<Date>(() => new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarUnifiedEvent | null>(null);
 
   // Filters
@@ -1197,6 +1193,7 @@ export function CalendarView({
 
             {/* Event Body */}
             <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              {selectedEvent.rawSource === 'appointment' && <VirtualyardSyncStatus key={selectedEvent.id} appointment={selectedEvent.rawObject} />}
               <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-mono block">Scheduled Date & Time</span>

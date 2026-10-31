@@ -278,6 +278,9 @@ export interface DeliveryHandoverWatch {
 }
 
 export interface Appointment {
+  bookingRequestId?: string;
+  virtualyard?: { vehicleId: string; vehicleName?: string; userId: string; userName?: string; customerId: string; customerName: string; locationId: string; bookingType: string; status: string };
+  virtualyardSync?: { state: 'pending' | 'sending' | 'synced' | 'failed' | 'unknown' | 'not_applicable'; externalId?: string; message?: string };
   appointment_id: string;
   lead_appointment_id?: string;
   customer_id: string;
@@ -290,7 +293,7 @@ export interface Appointment {
   loop?: string;
   consultant: string;
   site: SiteLocation;
-  status: 'Confirmed' | 'Completed' | 'Cancelled' | 'No Show';
+  status: 'Pending' | 'Confirmed' | 'In-Progress' | 'Completed' | 'Rescheduled' | 'Cancelled' | 'No Show';
   notes?: string;
 }
 

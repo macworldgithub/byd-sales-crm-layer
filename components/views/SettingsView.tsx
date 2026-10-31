@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useCrm } from '@/lib/crmContext';
 import { allocationApi } from '@/lib/api';
+import { VirtualyardConnection } from '@/components/VirtualyardConnection';
 
 export function SettingsView() {
   const { selectedSite, addToast } = useCrm();
@@ -245,6 +246,7 @@ export function SettingsView() {
           </div>
 
           <div className="space-y-2.5 pt-1 text-xs">
+            <VirtualyardConnection />
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
