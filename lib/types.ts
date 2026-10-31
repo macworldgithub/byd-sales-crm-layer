@@ -45,7 +45,7 @@ export interface Customer {
   site: SiteLocation;
   owner_user_id: string;
   owner_name: string;
-  source: 'Virtual Yard' | 'Autogate' | 'Manual' | 'Carsales' | 'Walk-in' | 'Web';
+  source: string;
   record_type: CustomerRecordType;
   company_name?: string;
   lead_prospect_id?: string;

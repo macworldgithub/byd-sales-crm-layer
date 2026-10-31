@@ -70,7 +70,6 @@ export function VirtualYardView() {
     if (type === 'model') setModelFilter(val);
   };
 
-  const models = ['All', 'ATTO 3', 'DOLPHIN', 'SEAL', 'SEALION 7', 'SHARK 6'];
 
   return (
     <div className="view-stack">

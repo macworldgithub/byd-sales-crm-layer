@@ -131,7 +131,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
     if (!intakeName || !intakePhone || !consultants.some(c => c.name === intakeConsultant)) return;
     setIsSubmittingIntake(true);
     try {
-      await createAllocation({
+      const saved = await createAllocation({
         lead_prospect_id: `LP-${Date.now().toString().slice(-6)}`,
         name: intakeName,
         phone: intakePhone,
@@ -143,6 +143,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
         intent_summary: `Direct walk-in / BDC intake inquiry for ${intakeVehicle}. Immediate contact requested.`,
         urgency: 'high',
       });
+      if (!saved) return;
       setShowIntakeModal(false);
       setIntakeName('');
       setIntakePhone('');
@@ -327,7 +328,6 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
           >
             <option value="All">All Assigned Consultants</option>
               {reference.consultants.map(name => <option key={name} value={name}>{name}</option>)}
-            {consultants.map(c => <option key={c.email} value={c.name}>{c.name}</option>)}
           </select>
         </div>
 

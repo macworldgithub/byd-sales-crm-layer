@@ -12,7 +12,7 @@ interface AddCustomerModalProps {
 }
 
 export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCustomerModalProps) {
-  const { customers, selectedSite, addCustomer, sites } = useCrm();
+  const { customers, selectedSite, addCustomer, sites, reference } = useCrm();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -22,7 +22,7 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
   const [site, setSite] = useState<SiteLocation>(
     selectedSite !== 'All Sites' ? selectedSite : ''
   );
-  const [source, setSource] = useState<'Walk-in' | 'Carsales' | 'Virtual Yard' | 'Autogate' | 'Web'>('Walk-in');
+  const [source, setSource] = useState('');
   const [notes, setNotes] = useState('');
   const [consentSms, setConsentSms] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -221,17 +221,15 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
             <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
               Inbound Source
             </label>
-            <select
+            <input
               value={source}
-              onChange={(e) => setSource(e.target.value as any)}
+              onChange={(e) => setSource(e.target.value)}
+              list="customer-sources"
+              placeholder="Select or enter the actual source"
+              required
               className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
-            >
-              <option value="Walk-in">Showroom Walk-in</option>
-              <option value="Carsales">Carsales.com.au</option>
-              <option value="Virtual Yard">Virtual Yard / Web Inventory</option>
-              <option value="Autogate">Autogate</option>
-              <option value="Web">BYD Official Website</option>
-            </select>
+            />
+            <datalist id="customer-sources">{reference.sources.map(value => <option key={value} value={value} />)}</datalist>
           </div>
 
           <div>
