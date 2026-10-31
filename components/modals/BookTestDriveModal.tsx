@@ -7,13 +7,14 @@ import { Appointment, Customer } from '@/lib/types';
 import { virtualyardApi, VirtualyardOption, VirtualyardOptions } from '@/lib/api';
 import { melbourneBookingTime } from '@/lib/bookingTime';
 import { useVirtualyardLookup } from '@/lib/useVirtualyardLookup';
+import { VirtualyardSelect } from '@/components/VirtualyardSelect';
 
 interface BookTestDriveModalProps { isOpen: boolean; onClose: () => void; preselectedCustomer?: Customer | null }
 const fieldClass = 'w-full text-sm p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none';
 const localStatus: Record<string, Appointment['status']> = { P: 'Pending', C: 'Confirmed', I: 'In-Progress', F: 'Completed', R: 'Rescheduled', X: 'Cancelled', M: 'No Show' };
 
 export function BookTestDriveModal({ isOpen, onClose, preselectedCustomer }: BookTestDriveModalProps) {
-  const { customers, selectedSite, createAppointment } = useCrm();
+  const { customerOptions: customers, selectedSite, createAppointment } = useCrm();
   const [customerId, setCustomerId] = useState('');
   const [options, setOptions] = useState<VirtualyardOptions | null>(null);
   const [vehicleQuery, setVehicleQuery] = useState('');
@@ -71,14 +72,18 @@ export function BookTestDriveModal({ isOpen, onClose, preselectedCustomer }: Boo
   const allCustomers = preselectedCustomer && !customers.some(c => c.customer_id === preselectedCustomer.customer_id) ? [preselectedCustomer, ...customers] : customers;
   const targetCustomer = allCustomers.find(c => c.customer_id === customerId);
   if (!isOpen) return null;
-  const fleet = vehicles.filter(vehicle => vehicle.locationId === yardId);
+  const selectVehicle = (id: string) => {
+    setVehicleId(id);
+    const vehicle = vehicles.find(row => row.id === id);
+    if (vehicle?.locationId && options?.yards.some(yard => yard.id === vehicle.locationId)) setYardId(vehicle.locationId);
+  };
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (inFlight.current || !targetCustomer || !driver) return;
     inFlight.current = true; setSubmitting(true); setError('');
     try {
       const yard = options?.yards.find(row => row.id === yardId);
-      const vehicle = fleet.find(row => row.id === vehicleId);
+      const vehicle = vehicles.find(row => row.id === vehicleId);
       if (!yard || !vehicle || !userId) throw new Error('Select a yard, demo vehicle and salesperson.');
       const appointment = await createAppointment({
         bookingRequestId: requestId.current, customer_id: targetCustomer.customer_id, customer_name: targetCustomer.name,
@@ -95,13 +100,8 @@ export function BookTestDriveModal({ isOpen, onClose, preselectedCustomer }: Boo
   };
 
   const select = (label: string, value: string, onChange: (value: string) => void, rows: VirtualyardOption[]) => (
-    <label className="block text-xs font-semibold text-slate-700 space-y-1">
-      <span>{label}</span>
-      <select required className={fieldClass} value={value} onChange={event => onChange(event.target.value)} disabled={submitting || !!savedMessage}>
-        <option value="">Select…</option>
-        {rows.map(row => <option key={row.id} value={row.id}>{row.name}{row.registration ? ` · ${row.registration}` : ''}{row.phone ? ` · ${row.phone}` : ''}</option>)}
-      </select>
-    </label>
+    <VirtualyardSelect label={label} value={value} onChange={onChange} rows={rows} disabled={submitting || !!savedMessage}
+      yardNames={Object.fromEntries((options?.yards || []).map(yard => [yard.id, yard.name]))} />
   );
   const lookupFeedback = (lookup: ReturnType<typeof useVirtualyardLookup>, label: string) => (
     <div className="space-y-1 text-xs">
@@ -131,9 +131,9 @@ export function BookTestDriveModal({ isOpen, onClose, preselectedCustomer }: Boo
             <label className="block text-xs font-semibold text-slate-700 space-y-1"><span>Search demo vehicles</span>
               <input autoComplete="off" className={fieldClass} value={vehicleQuery} disabled={submitting || !!savedMessage} onChange={e => { setVehicleQuery(e.target.value); setVehicleId(''); }} placeholder="Model, stock number or registration" />
             </label>
-            {select('Demo vehicle', vehicleId, setVehicleId, fleet)}
+            {select('Demo vehicle', vehicleId, selectVehicle, vehicles)}
             {lookupFeedback(vehicleLookup, 'vehicles')}
-            {!vehicleLookup.loading && !vehicleLookup.error && !fleet.length && <p className="text-xs text-amber-700">No matching demo vehicles are available for this yard.</p>}
+            {!vehicleLookup.loading && !vehicleLookup.error && !vehicles.length && <p className="text-xs text-amber-700">No matching demo vehicles are available.</p>}
             <label className="block text-xs font-semibold text-slate-700 space-y-1"><span>Search salespeople</span>
               <input autoComplete="off" className={fieldClass} value={userQuery} disabled={submitting || !!savedMessage} onChange={e => { setUserQuery(e.target.value); setUserId(''); }} placeholder="Salesperson name" />
             </label>

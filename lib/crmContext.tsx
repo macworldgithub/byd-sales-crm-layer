@@ -95,6 +95,7 @@ interface CrmContextType {
 
   // Data Collections (Filtered by Site where applicable)
   customers: Customer[];
+  customerOptions: Customer[];
   opportunities: Opportunity[];
   allocations: AllocationItem[];
   timelineEvents: TimelineEvent[];
@@ -1547,6 +1548,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         setCurrentRole: handleSetRole,
         isOnline,
         customers: filteredCustomers,
+        customerOptions: customers,
         opportunities: filteredOpportunities,
         allocations: filteredAllocations,
         timelineEvents,
