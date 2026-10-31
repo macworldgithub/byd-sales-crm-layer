@@ -31,6 +31,7 @@ import {
   INITIAL_AUDIT_LOG,
   CONSULTANT_SCORES,
 } from './data';
+import { confirmDealSold } from './dealActions';
 import { customerApi, opportunityApi, allocationApi, vyApi, syncApi, crmMessageApi, authApi, boardApi, appointmentApi, getToken, getLockedSite } from './api';
 
 export interface ToastMessage {
@@ -944,143 +945,23 @@ export function CrmProvider({ children }: { children: ReactNode }) {
       is_factory_order?: boolean;
     }
   ): Promise<{ success: boolean; message: string }> => {
-    const opp = opportunities.find((o) => o.opportunity_id === opportunityId);
-    if (!opp) return { success: false, message: 'Opportunity not found' };
-
-    let vyOrderId = soldDetails.vy_order_id || `VYO-${Math.floor(70000 + Math.random() * 20000)}`;
-    let salesLogId = `SL-2026-09-${Math.floor(100 + Math.random() * 899)}`;
-    let deliveryClientId = `DC-${Math.floor(8000 + Math.random() * 1999)}`;
-
     try {
-      const res = await opportunityApi.markSold(opportunityId, {
-        ...soldDetails,
-        sale_type: soldDetails.sale_type || opp.sale_type || 'Retail',
-      });
-      if (res.success && res.data) {
-        if (res.data.salesLogId) salesLogId = res.data.salesLogId;
-        if (res.data.deliveryClientId) deliveryClientId = res.data.deliveryClientId;
-        if (res.data.vyOrderId) vyOrderId = res.data.vyOrderId;
-
-        // Refresh collections from MongoDB
-        syncApi.getSalesLog().then((sl) => { if (sl.success && sl.data) setSalesLog(sl.data); });
-        syncApi.getDeliveryWatch().then((dw) => { if (dw.success && dw.data) setDeliveryWatch(dw.data); });
-        vyApi.getStock().then((st) => { if (st.success && st.data) setVyStock(st.data); });
-      }
-    } catch (err) {
-      console.warn('executeMarkSold api error, continuing with local updates:', err);
+      const result = await confirmDealSold(opportunityId, soldDetails);
+      setOpportunities(prev => [result.opportunity, ...prev.filter(opp => opp.opportunity_id !== opportunityId)]);
+      const site = selectedSite === 'All Sites' ? undefined : selectedSite;
+      await Promise.allSettled([
+        fetchOpportunities({ page: 1, limit: 50, site }),
+        fetchSalesLog({ page: 1, limit: 50, site }),
+        fetchDeliveryWatch({ page: 1, limit: 20, site }),
+        fetchVyStock({ page: 1, limit: 20, site }),
+      ]);
+      addToast(result.deliverySyncPending ? 'info' : 'success', 'Deal marked as sold', result.message);
+      return { success: true, message: result.message };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The deal could not be marked as sold.';
+      addToast('error', 'Mark Sold failed', message);
+      return { success: false, message };
     }
-
-    // 1. Update Opportunity
-    setOpportunities((prev) =>
-      prev.map((o) => {
-        if (o.opportunity_id === opportunityId) {
-          return {
-            ...o,
-            stage: 'Written / Sold',
-            vy_stock_id: soldDetails.vy_stock_id || o.vy_stock_id || 'VY-VIC-84920',
-            vy_order_id: vyOrderId,
-            sales_log_id: salesLogId,
-            delivery_client_id: deliveryClientId,
-            delivery_stage: 'Scheduled',
-            sale_type: soldDetails.sale_type,
-            secondary_owner: soldDetails.secondary_salesperson,
-            sync_status: 'synced',
-            updated_at: new Date().toISOString(),
-          };
-        }
-        return o;
-      })
-    );
-
-    // 2. Virtual Yard: Update Stock Status to Sold
-    if (soldDetails.vy_stock_id) {
-      setVyStock((prev) =>
-        prev.map((s) =>
-          s.stock_id === soldDetails.vy_stock_id
-            ? { ...s, status: 'Sold', held_for_customer: opp.customer_name }
-            : s
-        )
-      );
-    }
-
-    // 3. Sales Log: Create New Written Row (§5.7)
-    const newSalesLogRow: SalesLogEntry = {
-      sales_log_id: salesLogId,
-      deal_date: new Date().toISOString().split('T')[0],
-      customer_name: opp.customer_name,
-      vehicle: opp.vehicle_descriptor,
-      vin: soldDetails.vin,
-      stock_id: soldDetails.vy_stock_id || 'VY-VIC-84920',
-      sale_type: soldDetails.sale_type,
-      consultant: soldDetails.primary_salesperson,
-      site: opp.site,
-      amount: opp.total_deal_value,
-      gross: Math.round(opp.total_deal_value * 0.075),
-      reconciled: true,
-      crm_opportunity_id: opportunityId,
-    };
-    setSalesLog((prev) => [newSalesLogRow, ...prev.filter((sl) => sl.sales_log_id !== salesLogId)]);
-
-    // 4. Delivery Centre: Upsert Client with imported_from = 'crm' (§5.8, §7.5)
-    const newDeliveryWatcher: DeliveryHandoverWatch = {
-      client_id: deliveryClientId,
-      opportunity_id: opportunityId,
-      customer_name: opp.customer_name,
-      phone: opp.customer_phone,
-      vehicle: opp.vehicle_descriptor,
-      vin: soldDetails.vin,
-      rego: 'Awaiting Registration',
-      stage: 'Scheduled',
-      delivery_date: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
-      delivery_consultant: 'Rachel Adams',
-      handover_specialist: 'Rachel Adams',
-      contact_status: 'Contacted',
-      docs_completeness: 'Partial',
-      docs_status: {
-        atrSigned: true,
-        licenceFront: true,
-        insurance: false,
-        paymentSettled: soldDetails.deposit >= 2000,
-      },
-      arrived: true,
-      last_comment: `Order imported from Sales CRM (${opportunityId}). Deposit $${soldDetails.deposit.toLocaleString()} captured. Scheduled for pre-delivery detailing.`,
-    };
-    setDeliveryWatch((prev) => [newDeliveryWatcher, ...prev.filter((d) => d.client_id !== deliveryClientId)]);
-
-    // 5. Timeline Events & Audit
-    const soldEvent: TimelineEvent = {
-      event_id: `EVT-${Date.now().toString().slice(-4)}`,
-      customer_id: opp.customer_id,
-      opportunity_id: opp.opportunity_id,
-      occurred_at: 'Just now (AEST)',
-      source: 'Sales CRM',
-      type: 'sales_log_write',
-      author: currentUser.name,
-      title: 'Deal Written & Sold (3-Way Orchestration)',
-      content: `Mark Sold transaction executed. Created VY Order ${vyOrderId}, Sales Log row ${salesLogId}, and Delivery Centre client ${deliveryClientId} (imported_from='crm').`,
-      visibility: 'internal',
-    };
-    setTimelineEvents((prev) => [soldEvent, ...prev]);
-
-    const audit: AuditLogEntry = {
-      audit_id: `AUD-${Date.now().toString().slice(-4)}`,
-      actor: currentUser.name,
-      action: 'Mark Sold (Orchestrated)',
-      target_type: 'Opportunity',
-      target_id: opportunityId,
-      details: `Sold marked: VY Order ${vyOrderId}, Sales Log ${salesLogId}, Delivery Client ${deliveryClientId}. VIN ${soldDetails.vin}.`,
-      source: 'Sales CRM',
-      timestamp: new Date().toISOString(),
-    };
-    setAuditLog((prev) => [audit, ...prev]);
-
-    addToast(
-      'success',
-      'Deal Written & Sold!',
-      `Successfully orchestrated in MongoDB across Virtual Yard, Sales Log and Delivery Centre.`
-    );
-
-    return { success: true, message: 'Deal marked as sold and synced downstream.' };
   };
 
   // Lead Intake Allocations (§5.3 & AC-4)

@@ -44,6 +44,7 @@ export function Sidebar({
 
   const mainNav = [
     { id: 'home', label: 'Home', icon: LayoutDashboard },
+    { id: 'leads', label: 'Leads', icon: Users },
     {
       id: 'pipeline',
       label: 'Deals Pipeline',

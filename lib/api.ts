@@ -79,6 +79,12 @@ export async function fetchApi<T>(
   totalPages?: number;
   pagination?: PaginationMeta;
   hasMore?: boolean;
+  meta?: {
+    filters?: Record<string, string[]>;
+    totalValue?: number;
+    stages?: Record<string, { count: number; value: number }>;
+    timezone?: string;
+  };
   message?: string;
   existingCustomer?: any;
 }> {
@@ -124,6 +130,11 @@ function buildQueryString(params?: Record<string, string | number | boolean | un
   const qs = searchParams.toString();
   return qs ? `?${qs}` : '';
 }
+
+export const browseApi = {
+  list: <T,>(resource: 'leads' | 'opportunities' | 'calendar', params: Record<string, string | number | boolean | undefined>, signal?: AbortSignal) =>
+    fetchApi<T[]>(`/crm/${resource}${buildQueryString(params)}`, { cache: 'no-store', signal }),
+};
 
 // ─── CRM Customers API ───────────────────────────────────────────────────────
 export const customerApi = {

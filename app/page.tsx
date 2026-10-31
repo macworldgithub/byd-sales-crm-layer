@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { HomeView } from '@/components/views/HomeView';
 import { PipelineView } from '@/components/views/PipelineView';
+import { LeadsView } from '@/components/views/LeadsView';
 import { AllocationsView } from '@/components/views/AllocationsView';
 import { CustomersView } from '@/components/views/CustomersView';
 import { AppointmentsView } from '@/components/views/AppointmentsView';
@@ -198,6 +199,8 @@ export default function SalesCrmApp() {
                   onOpenMarkSold={(opp) => setMarkSoldOpportunity(opp)}
                 />
               )}
+
+              {activeTab === 'leads' && <LeadsView />}
 
               {activeTab === 'inbox' && (
                 <AllocationsView

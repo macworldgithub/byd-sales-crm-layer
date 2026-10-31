@@ -35,10 +35,12 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
   const [financeMethod, setFinanceMethod] = useState('Finance');
   const [isFactoryOrder, setIsFactoryOrder] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   // Initialize defaults when modal opens or opportunity changes
   React.useEffect(() => {
     if (opportunity) {
+      setError('');
       setSaleType(opportunity.sale_type || 'Retail');
       setPrimarySalesperson(opportunity.owner_name || currentUser.name);
       setIsFactoryOrder(opportunity.order_type === 'Factory Order');
@@ -56,7 +58,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
         } else if (opportunity.order_type === 'Factory Order') {
           setVin('');
         } else {
-          setVin('6T1BYD' + Math.random().toString(36).substring(2, 10).toUpperCase());
+          setVin('');
         }
       }
     }
@@ -73,7 +75,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
 
     setIsSubmitting(true);
     try {
-      await executeMarkSold(opportunity.opportunity_id, {
+      const result = await executeMarkSold(opportunity.opportunity_id, {
         vin: vin.trim() || (isFactoryOrder ? 'FACTORY_ORDER_PENDING' : ''),
         vy_stock_id: selectedStockId || undefined,
         sale_type: saleType,
@@ -83,7 +85,8 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
         finance_method: financeMethod,
         is_factory_order: isFactoryOrder,
       });
-      onClose();
+      if (result.success) onClose();
+      else setError(result.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -162,6 +165,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5 flex-1">
+          {error && <p role="alert" className="p-3 rounded-lg bg-red-50 text-red-800 text-sm">{error}</p>}
           {/* Stock & VIN Selection */}
           <div className="space-y-3">
             <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-mono">

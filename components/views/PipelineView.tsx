@@ -21,6 +21,9 @@ import {
 import { useCrm } from '@/lib/crmContext';
 import { Opportunity, OpportunityStage, Customer, SaleType } from '@/lib/types';
 import { PaginationControls } from '@/components/ui/PaginationControls';
+import { useBrowse, useBrowseQuery } from '@/lib/useBrowse';
+import { customerApi, opportunityApi } from '@/lib/api';
+import { BrowseSelect, BrowseState, browseInput } from '@/components/ui/BrowseControls';
 
 interface PipelineViewProps {
   onSelectCustomer: (customer: Customer) => void;
@@ -33,38 +36,23 @@ export function PipelineView({
   onOpenQuickDeal,
   onOpenMarkSold,
 }: PipelineViewProps) {
-  const { opportunities, opportunitiesPagination, fetchOpportunities, customers, updateOpportunityStage, selectedSite, setSelectedSite } = useCrm();
-
+  const { opportunities: changedOpportunities, customers, selectedSite, setSelectedSite, addToast } = useCrm();
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
-  const [stageFilter, setStageFilter] = useState<string>('All');
-  const [searchFilter, setSearchFilter] = useState('');
-  const [modelFilter, setModelFilter] = useState('All');
-  const [consultantFilter, setConsultantFilter] = useState('All');
-  const [accountTypeFilter, setAccountTypeFilter] = useState('All');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(15);
+  const query = useBrowseQuery({ q: '', stage: '', model: '', owner: '', sale_type: '', dealYard: '' }, selectedSite);
+  const result = useBrowse<Opportunity>('opportunities', { ...query.filters, browse: true, site: selectedSite, page: query.page, limit: query.limit });
+  const opportunities = result.data;
+  const filteredDeals = opportunities;
+  const [saving, setSaving] = useState(false);
+  React.useEffect(() => { result.reload(); }, [changedOpportunities]);
+  const openCustomer = async (deal: Opportunity) => {
+    const cached = customers.find(customer => customer.customer_id === deal.customer_id);
+    if (cached) { onSelectCustomer(cached); return; }
+    const response = await customerApi.getCustomer(deal.customer_id);
+    if (response.success && response.data) onSelectCustomer(response.data);
+    else addToast('error', 'Customer record unavailable', response.message || 'No linked customer was found.');
+  };
 
-  React.useEffect(() => {
-    if (viewMode === 'list') {
-      const timer = setTimeout(() => {
-        fetchOpportunities({
-          page: currentPage,
-          limit: pageSize,
-          q: searchFilter.trim() || undefined,
-          stage: stageFilter !== 'All' ? stageFilter : undefined,
-          model: modelFilter !== 'All' ? modelFilter : undefined,
-          owner: consultantFilter !== 'All' ? consultantFilter : undefined,
-          site: selectedSite !== 'All Sites' ? selectedSite : undefined,
-          yard: selectedSite !== 'All Sites' ? selectedSite : undefined,
-          location: selectedSite !== 'All Sites' ? selectedSite : undefined,
-        });
-      }, 250);
-      return () => clearTimeout(timer);
-    }
-  }, [currentPage, pageSize, searchFilter, stageFilter, modelFilter, consultantFilter, selectedSite, viewMode, fetchOpportunities]);
-
-
-  const STAGES: OpportunityStage[] = [
+  const STAGES = [...new Set<OpportunityStage>([
     'New / Allocated',
     'Working',
     'Appointment',
@@ -73,51 +61,22 @@ export function PipelineView({
     'In Delivery',
     'Delivered / Won',
     'Lost / Parked',
-  ];
+    ...(result.meta?.filters?.stages || []) as OpportunityStage[],
+  ])];
 
-  // Unique list of consultants for filter dropdown (§5.5)
-  const allConsultants = Array.from(new Set(opportunities.map((o) => o.owner_name)));
-
-  // Filtering
-  const filteredDeals = opportunities.filter((opp) => {
-    if (stageFilter !== 'All' && opp.stage !== stageFilter) return false;
-    if (modelFilter !== 'All' && opp.model !== modelFilter) return false;
-    if (consultantFilter !== 'All' && opp.owner_name !== consultantFilter) return false;
-    if (accountTypeFilter !== 'All') {
-      if (accountTypeFilter === 'Fleet' && !opp.sale_type.toLowerCase().includes('fleet') && !opp.sale_type.toLowerCase().includes('abn')) return false;
-      if (accountTypeFilter === 'Retail' && opp.sale_type.toLowerCase().includes('fleet')) return false;
-      if (accountTypeFilter === 'Household' && !opp.customer_name.includes('&') && !opp.vehicle_descriptor.toLowerCase().includes('household')) return false;
-    }
-    if (searchFilter.trim()) {
-      const q = searchFilter.toLowerCase();
-      const matchName = opp.customer_name.toLowerCase().includes(q);
-      const matchVehicle = opp.vehicle_descriptor.toLowerCase().includes(q);
-      const matchId = opp.opportunity_id.toLowerCase().includes(q);
-      const matchVin = opp.vy_stock_id?.toLowerCase().includes(q);
-      const matchOwner = opp.owner_name.toLowerCase().includes(q);
-      if (!matchName && !matchVehicle && !matchId && !matchVin && !matchOwner) return false;
-    }
-    return true;
-  });
-
-  const totalPipelineValue = filteredDeals.reduce((sum, o) => sum + o.total_deal_value, 0);
-
-  const handleStageChange = (opp: Opportunity, newStage: OpportunityStage) => {
-    if (newStage === 'Written / Sold') {
-      onOpenMarkSold(opp);
-      return;
-    }
+  const totalPipelineValue = result.meta?.totalValue || 0;
+  const handleStageChange = async (opp: Opportunity, newStage: OpportunityStage) => {
+    if (newStage === 'Written / Sold') { onOpenMarkSold(opp); return; }
+    let reason: string | undefined;
     if (newStage === 'Lost / Parked') {
-      const reason = window.prompt(
-        'Mandatory Reason Code (§5.4):\nEnter reason for parking this deal (Price, Stock Unavailable, Chose Competitor, Finance Declined, Opted Out, Other):',
-        'Chose Competitor'
-      );
-      if (reason) {
-        updateOpportunityStage(opp.opportunity_id, newStage, reason);
-      }
-      return;
+      reason = window.prompt('Reason for parking this deal (Price, Stock Unavailable, Chose Competitor, Finance Declined, Opted Out, Other):')?.trim();
+      if (!reason) return;
     }
-    updateOpportunityStage(opp.opportunity_id, newStage);
+    setSaving(true);
+    const response = await opportunityApi.updateOpportunity(opp.opportunity_id, { stage: newStage, loss_reason: reason } as any);
+    setSaving(false);
+    if (response.success) result.reload();
+    else addToast('error', 'Stage change failed', response.message || 'Please try again.');
   };
 
   return (
@@ -191,78 +150,19 @@ export function PipelineView({
       )}
 
 
-      {/* Filter Bar Row */}
-      <div className="p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex items-center gap-2.5 w-full lg:flex-1">
-          <div className="relative w-full sm:col-span-2 lg:col-span-1 lg:max-w-xs">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Filter deals by buyer, vehicle, stock ID..."
-              className="w-full text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
-            />
-          </div>
-
-          <select
-            value={modelFilter}
-            onChange={(e) => setModelFilter(e.target.value)}
-            className="w-full lg:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
-          >
-            <option value="All">All BYD Models</option>
-            <option value="SEALION 7">SEALION 7</option>
-            <option value="SEAL">SEAL</option>
-            <option value="ATTO 3">ATTO 3</option>
-            <option value="SHARK 6">SHARK 6</option>
-            <option value="DOLPHIN">DOLPHIN</option>
-          </select>
-
-          <select
-            value={stageFilter}
-            onChange={(e) => setStageFilter(e.target.value)}
-            className="w-full lg:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
-          >
-            <option value="All">All Stages ({opportunities.length})</option>
-            {STAGES.map((s) => (
-              <option key={s} value={s}>
-                {s} ({opportunities.filter((o) => o.stage === s).length})
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={consultantFilter}
-            onChange={(e) => setConsultantFilter(e.target.value)}
-            className="w-full lg:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
-          >
-            <option value="All">All Consultants ({allConsultants.length})</option>
-            {allConsultants.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={accountTypeFilter}
-            onChange={(e) => setAccountTypeFilter(e.target.value)}
-            className="w-full lg:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
-          >
-            <option value="All">All Account Types</option>
-            <option value="Retail">Retail (Private)</option>
-            <option value="Fleet">Fleet / Commercial (ABN)</option>
-            <option value="Household">Household Group</option>
-          </select>
+      <div className="surface-card p-4 space-y-3">
+        <label className="flex flex-col gap-1 text-xs text-slate-600">Search all matching deals<input className={browseInput} value={query.filters.q} onChange={e => query.change('q', e.target.value)} placeholder="Buyer, phone, vehicle, stock, order ID, VIN or consultant…" /></label>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <BrowseSelect label="Stages" value={query.filters.stage} values={[...new Set([...STAGES, ...(result.meta?.filters?.stages || [])])]} onChange={v => query.change('stage', v)} />
+          <BrowseSelect label="Models" value={query.filters.model} values={result.meta?.filters?.models || []} onChange={v => query.change('model', v)} />
+          <BrowseSelect label="Consultants" value={query.filters.owner} values={result.meta?.filters?.owners || []} onChange={v => query.change('owner', v)} />
+          <BrowseSelect label="Sale types" value={query.filters.sale_type} values={result.meta?.filters?.saleTypes || []} onChange={v => query.change('sale_type', v)} />
+          <BrowseSelect label="Yards" value={query.filters.dealYard} values={result.meta?.filters?.yards || []} onChange={v => query.change('dealYard', v)} />
         </div>
-
-        <div className="text-xs font-mono text-slate-500 pt-1 lg:pt-0 border-t lg:border-t-0 border-slate-100 flex items-center justify-between lg:justify-end gap-2">
-          <span>Total Pipeline Value:</span>
-          <span>
-            <strong className="text-slate-900 font-bold">${totalPipelineValue.toLocaleString()}</strong> ({filteredDeals.length} active)
-          </span>
-        </div>
+        <div className="flex flex-wrap gap-4 items-center justify-between text-sm"><p>{result.pagination?.total || 0} matching deals · Total value <strong>${totalPipelineValue.toLocaleString()}</strong></p><div className="flex gap-3"><button onClick={query.reset} className="text-red-700 font-semibold">Clear filters</button><button onClick={result.reload} className={browseInput}>Refresh</button></div></div>
+        <p className="text-xs text-slate-500">Board and list show the selected page. Counts and values cover all matching deals.</p>
       </div>
+      <BrowseState loading={result.loading} error={result.error} empty={!result.data.length} retry={result.reload} />
 
       {/* KANBAN BOARD VIEW */}
       {viewMode === 'board' ? (
@@ -270,7 +170,7 @@ export function PipelineView({
           <div className="flex gap-3 sm:gap-4 min-w-max">
             {STAGES.map((colStage) => {
               const stageDeals = filteredDeals.filter((d) => d.stage === colStage);
-              const colValue = stageDeals.reduce((sum, d) => sum + d.total_deal_value, 0);
+              const colValue = result.meta?.stages?.[colStage]?.value || 0;
 
               return (
                 <div key={colStage} className="kanban-col">
@@ -283,14 +183,14 @@ export function PipelineView({
                       </span>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono">
-                      {stageDeals.length}
+                      {stageDeals.length} on page / {result.meta?.stages?.[colStage]?.count || 0} total
                     </span>
                   </div>
 
                   {/* Deals Cards */}
                   <div className="kanban-body">
                     {stageDeals.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-slate-400 italic">No deals</div>
+                      <div className="p-4 text-center text-xs text-slate-400 italic">No deals on this page</div>
                     ) : (
                       stageDeals.map((deal) => (
                         <div
@@ -359,6 +259,7 @@ export function PipelineView({
                           {/* Card Footer: Stage Selector & Customer 360 Action */}
                           <div className="pt-1 flex items-center justify-between border-t border-slate-100 text-xs">
                             <select
+                              disabled={saving}
                               value={deal.stage}
                               onChange={(e) => handleStageChange(deal, e.target.value as OpportunityStage)}
                               className="text-[10px] font-bold p-1 rounded-lg border border-slate-200 bg-white outline-none cursor-pointer"
@@ -372,8 +273,7 @@ export function PipelineView({
 
                             <button
                               onClick={() => {
-                                const cust = customers.find((c) => c.customer_id === deal.customer_id);
-                                if (cust) onSelectCustomer(cust);
+                                void openCustomer(deal);
                               }}
                               className="text-[11px] font-semibold text-[#e60012] hover:underline"
                             >
@@ -472,8 +372,7 @@ export function PipelineView({
                         )}
                         <button
                           onClick={() => {
-                            const cust = customers.find((c) => c.customer_id === deal.customer_id);
-                            if (cust) onSelectCustomer(cust);
+                            void openCustomer(deal);
                           }}
                           className="px-2.5 py-1 rounded border border-slate-200 text-slate-700 hover:bg-slate-100 text-[11px] font-semibold"
                         >
@@ -486,24 +385,10 @@ export function PipelineView({
               </tbody>
             </table>
           </div>
-          {/* Pagination Controls in List Mode */}
-          <div className="p-3 border-t border-slate-100">
-            <PaginationControls
-              pagination={opportunitiesPagination}
-              currentPage={currentPage}
-              totalItems={opportunitiesPagination?.total ?? opportunities.length}
-              pageSize={pageSize}
-              pageSizeOptions={[15, 30, 50]}
-              itemLabel="deals"
-              onPageChange={(p) => setCurrentPage(p)}
-              onPageSizeChange={(s) => {
-                setPageSize(s);
-                setCurrentPage(1);
-              }}
-            />
-          </div>
+
         </div>
       )}
+      {!result.loading && !result.error && <PaginationControls pagination={result.pagination} currentPage={query.page} totalItems={result.pagination?.total || 0} pageSize={query.limit} pageSizeOptions={[10, 25, 50, 100]} itemLabel="deals" onPageChange={query.setPage} onPageSizeChange={query.setLimit} />}
     </div>
   );
 }
