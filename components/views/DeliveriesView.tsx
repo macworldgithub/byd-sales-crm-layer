@@ -28,8 +28,7 @@ export function DeliveriesView() {
     requestDeliveryDateChange,
     selectedSite,
     setSelectedSite,
-    addToast,
-  } = useCrm();
+    addToast, reference, sites} = useCrm();
 
   const [searchFilter, setSearchFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('All');
@@ -141,20 +140,7 @@ export function DeliveriesView() {
     setRequestedDate('');
   };
 
-  const SITES = [
-    'All Locations',
-    'BYD Nunawading',
-    'BYD Melbourne City',
-    'BYD Fairfield',
-    'BYD Caroline Springs',
-    'BYD Doncaster',
-    'Denza Melbourne',
-    'Holding Yard VIC',
-    'Nunawading',
-    'Fairfield',
-    'Melbourne City',
-    'Caroline Springs',
-  ];
+  const SITES = ['All Locations', ...sites];
 
   return (
     <div className="view-stack">

@@ -1,278 +1,164 @@
 'use client';
-
-import React, { useState } from 'react';
-import {
-  Settings as SettingsIcon,
-  Sliders,
-  Clock,
-  Users,
-  Shield,
-  Network,
-  CheckCircle2,
-  Save,
-  Radio,
-  RefreshCw,
-  BellRing,
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useCrm } from '@/lib/crmContext';
-import { allocationApi } from '@/lib/api';
+import { runtimeApi } from '@/lib/api';
 import { VirtualyardConnection } from '@/components/VirtualyardConnection';
+import { browseInput, BrowseState } from '@/components/ui/BrowseControls';
 
 export function SettingsView() {
-  const { selectedSite, addToast } = useCrm();
-
-  // Split Rules State (§5.5)
-  const [defaultSplitPct, setDefaultSplitPct] = useState('50');
-  const [allowCustomSplit, setAllowCustomSplit] = useState(true);
-  const [splitTrigger, setSplitTrigger] = useState('handover');
-
-  // SLA Configuration (§5.3)
-  const [slaTimeoutMinutes, setSlaTimeoutMinutes] = useState('15');
-  const [autoEscalateRole, setAutoEscalateRole] = useState('manager');
-
-  // Network Lookup Privilege (§4)
-  const [enableNetworkLookup, setEnableNetworkLookup] = useState(true);
-
-  // Testing SLA check
-  const [isCheckingSla, setIsCheckingSla] = useState(false);
-
-  const handleSaveSettings = () => {
-    addToast('success', 'Settings Saved', 'Dealership attribution and SLA governance parameters updated successfully.');
-  };
-
-  const handleTriggerSlaEvaluation = async () => {
-    setIsCheckingSla(true);
+  const { currentUser, currentRole, reference, addToast } = useCrm();
+  const [sla, setSla] = useState('');
+  const [hold, setHold] = useState('');
+  const [health, setHealth] = useState<any>(null);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const canEdit =
+    ['manager', 'site_admin', 'super_admin'].includes(currentRole) &&
+    (currentUser.all_sites || !Array.isArray(currentUser.allowed_sites));
+  const load = async () => {
+    setLoading(true);
+    setError('');
     try {
-      const res = await allocationApi.checkSla();
-      if (res.success) {
-        addToast(
-          'success',
-          'SLA Evaluation Finished',
-          `Checked active allocations. Escalated ${res.data?.escalatedCount || 0} overdue leads to floor manager.`
-        );
-      }
-    } catch {
-      addToast('error', 'SLA Check Failed', 'Could not evaluate SLA queues.');
+      const [config, status] = await Promise.all([
+        runtimeApi.governance(),
+        runtimeApi.health(),
+      ]);
+      if (!config.success || !config.data)
+        throw new Error(config.message || 'Configuration is unavailable.');
+      setSla(String(config.data.effective.slaTimeoutMinutes));
+      setHold(String(config.data.effective.stockHoldHours));
+      setUpdatedAt(config.data.updatedAt);
+      setHealth(status.success ? (status as any).data || status : null);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Unable to load configuration.'
+      );
     } finally {
-      setIsCheckingSla(false);
+      setLoading(false);
     }
   };
-
+  useEffect(() => {
+    void load();
+  }, []);
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const response = await runtimeApi.saveGovernance({
+        slaTimeoutMinutes: Number(sla),
+        stockHoldHours: Number(hold),
+      });
+      if (!response.success)
+        throw new Error(response.message || 'Configuration was not saved.');
+      setUpdatedAt(response.data.updatedAt);
+      addToast('success', 'Configuration saved');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
-    <div className="view-stack space-y-6">
-      {/* Intro Header */}
+    <div className="view-stack space-y-4">
       <div className="page-intro">
         <div>
-          <span className="eyebrow flex items-center gap-1.5 font-mono">
-            <span className="w-2 h-2 rounded-full bg-slate-600" />
-            Dealership Governance & Rules Engine (§4, §5.3, §5.5)
-          </span>
-          <h1 className="page-title mt-1">CRM System Configuration</h1>
+          <h1 className="page-title">CRM Settings</h1>
           <p className="page-subtitle">
-            Manage secondary consultant attribution split rules, lead intake SLA response timers, and cross-site manager network lookup privileges.
+            Current connection status and applied dealership rules.
           </p>
         </div>
-
-        <button
-          onClick={handleSaveSettings}
-          className="btn btn-primary flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase"
-        >
-          <Save className="w-4 h-4" />
-          <span>Save Changes</span>
+        <button className={browseInput} onClick={load}>
+          Refresh
         </button>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Section 1: Secondary Attribution Split Rules (§5.5) */}
-        <div className="card p-6 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Users className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">Attribution & Split Rules (§5.5)</h2>
-              <p className="text-xs text-slate-500">Configures credit distribution when two sales consultants work a deal.</p>
-            </div>
-          </div>
-
-          <div className="space-y-4 pt-1">
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Default Secondary Consultant Commission Split
-              </label>
-              <select
-                value={defaultSplitPct}
-                onChange={(e) => setDefaultSplitPct(e.target.value)}
-                className="w-full text-xs font-medium border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              >
-                <option value="50">50% / 50% Equal Split (Default)</option>
-                <option value="60">60% Primary / 40% Secondary</option>
-                <option value="70">70% Primary / 30% Secondary</option>
-                <option value="80">80% Primary / 20% Secondary</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Attribution Trigger Condition
-              </label>
-              <select
-                value={splitTrigger}
-                onChange={(e) => setSplitTrigger(e.target.value)}
-                className="w-full text-xs font-medium border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              >
-                <option value="handover">Physical Handover on Yard / Test Drive Assist</option>
-                <option value="lead_pass">Intake Handover from BDC Specialist</option>
-                <option value="finance_assist">Business Manager / Finance Closing Assist</option>
-              </select>
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-              <div>
-                <p className="text-xs font-semibold text-slate-800">Allow Manual Split Adjustment</p>
-                <p className="text-[11px] text-slate-500">Sales managers can adjust split percentages per individual deal.</p>
-              </div>
+      <BrowseState loading={loading} error={error} empty={false} retry={load} />
+      {!loading && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <form className="surface-card p-5 space-y-4" onSubmit={save}>
+            <h2 className="font-semibold">Applied rules</h2>
+            <label className="block text-sm">
+              First response SLA (minutes)
               <input
-                type="checkbox"
-                checked={allowCustomSplit}
-                onChange={(e) => setAllowCustomSplit(e.target.checked)}
-                className="w-4 h-4 text-[#e60012] rounded border-slate-300"
+                required
+                disabled={!canEdit || saving}
+                className={`${browseInput} block mt-1 w-full`}
+                type="number"
+                min="1"
+                max="1440"
+                value={sla}
+                onChange={(e) => setSla(e.target.value)}
               />
-            </div>
-          </div>
-        </div>
-
-        {/* Section 2: Lead SLA & Escalation (§5.3) */}
-        <div className="card p-6 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">Lead SLA & Escalation Queue (§5.3)</h2>
-              <p className="text-xs text-slate-500">Response time limits for newly allocated leads during trading hours.</p>
-            </div>
-          </div>
-
-          <div className="space-y-4 pt-1">
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                First-Touch SLA Response Window
-              </label>
-              <select
-                value={slaTimeoutMinutes}
-                onChange={(e) => setSlaTimeoutMinutes(e.target.value)}
-                className="w-full text-xs font-medium border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-              >
-                <option value="10">10 Minutes (Aggressive)</option>
-                <option value="15">15 Minutes (BYD Standard Specification)</option>
-                <option value="30">30 Minutes (Weekend / High Volume)</option>
-                <option value="60">60 Minutes (Off-Peak)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Escalation Target on SLA Breach
-              </label>
-              <select
-                value={autoEscalateRole}
-                onChange={(e) => setAutoEscalateRole(e.target.value)}
-                className="w-full text-xs font-medium border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-              >
-                <option value="manager">Floor Sales Manager Inbox</option>
-                <option value="round_robin">Re-allocate to Next Available Consultant</option>
-                <option value="bdc">Return to BDC Lead Intake Pool</option>
-              </select>
-            </div>
-
-            <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-200/60 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-amber-900">Run SLA Queue Sweep Now</p>
-                <p className="text-[11px] text-amber-700">Manually triggers backend evaluation for any expired SLA clocks.</p>
-              </div>
+            </label>
+            <label className="block text-sm">
+              Stock reservation duration (hours)
+              <input
+                required
+                disabled={!canEdit || saving}
+                className={`${browseInput} block mt-1 w-full`}
+                type="number"
+                min="1"
+                max="720"
+                value={hold}
+                onChange={(e) => setHold(e.target.value)}
+              />
+            </label>
+            <p className="text-xs text-slate-500">
+              {updatedAt
+                ? `Last saved: ${new Date(updatedAt).toLocaleString()}`
+                : 'No custom rules have been saved. These are the currently applied service rules.'}
+            </p>
+            {canEdit ? (
               <button
-                onClick={handleTriggerSlaEvaluation}
-                disabled={isCheckingSla}
-                className="py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+                disabled={saving || !sla || !hold}
+                className="signal-button rounded-lg px-4 py-2"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isCheckingSla ? 'animate-spin' : ''}`} />
-                <span>Evaluate</span>
+                {saving ? 'Saving…' : 'Save rules'}
               </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 3: Manager Cross-Site Network Lookup (§4) */}
-        <div className="card p-6 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Network className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">Manager Network Lookup (§4)</h2>
-              <p className="text-xs text-slate-500">Cross-dealership customer searching for managers and site admins.</p>
-            </div>
-          </div>
-
-          <div className="space-y-3 pt-1">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-              <div>
-                <p className="text-xs font-semibold text-slate-800">Enable Manager Cross-Site Lookup Flag</p>
-                <p className="text-[11px] text-slate-500">
-                  Allows Managers, Site Admins, and Super Admins to search across Fairfield, Melbourne City, Doncaster, Nunawading, and Caroline Springs simultaneously.
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={enableNetworkLookup}
-                onChange={(e) => setEnableNetworkLookup(e.target.checked)}
-                className="w-4 h-4 text-[#e60012] rounded border-slate-300"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Section 4: Subsystem Interconnect Status (§7.3) */}
-        <div className="card p-6 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Shield className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">Subsystem Integrations (§7.3, §7.4)</h2>
-              <p className="text-xs text-slate-500">Active status of connected BYD dealership ecosystem platforms.</p>
-            </div>
-          </div>
-
-          <div className="space-y-2.5 pt-1 text-xs">
+            ) : (
+              <p className="text-sm text-slate-500">
+                An administrator with access to all sites can change these
+                rules.
+              </p>
+            )}
+          </form>
+          <section className="surface-card p-5 space-y-4">
+            <h2 className="font-semibold">Connections and saved data</h2>
             <VirtualyardConnection />
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="font-semibold text-slate-800">Lead Centre Direct Database & API Pipeline</span>
+            <dl className="space-y-3 text-sm">
+              {Object.entries(health?.databases || {}).map(([key, value]) => (
+                <div className="flex justify-between" key={key}>
+                  <dt>
+                    {key === 'leadCenter'
+                      ? 'Lead Centre database'
+                      : 'Delivery Centre database'}
+                  </dt>
+                  <dd>{String(value)}</dd>
+                </div>
+              ))}
+              <div className="flex justify-between">
+                <dt>Inventory records in this scope</dt>
+                <dd>{reference.inventoryCount.toLocaleString()}</dd>
               </div>
-              <span className="text-[11px] font-mono text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded">Active / Ingesting</span>
-            </div>
-
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="font-semibold text-slate-800">Virtual Yard Live Inventory</span>
+              <div className="flex justify-between">
+                <dt>Saved SMS templates</dt>
+                <dd>{reference.smsTemplates.length}</dd>
               </div>
-              <span className="text-[11px] font-mono text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded">865 Stock Units Synced</span>
-            </div>
-
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="font-semibold text-slate-800">Delivery Centre 3-Way Handover Sync</span>
-              </div>
-              <span className="text-[11px] font-mono text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded">Instant Push Enabled</span>
-            </div>
-          </div>
+            </dl>
+            {!health && (
+              <p className="text-amber-800 text-sm">
+                Connection status is unavailable.
+              </p>
+            )}
+            <p className="text-sm text-slate-500">
+              Account roles and site permissions are managed under Users &
+              Access.
+            </p>
+          </section>
         </div>
-      </div>
+      )}
     </div>
   );
 }

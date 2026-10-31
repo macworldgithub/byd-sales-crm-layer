@@ -30,7 +30,7 @@ export function CustomersView({
   onOpenAddCustomer,
   onOpenMergeModal,
 }: CustomersViewProps) {
-  const { customers, customersPagination, fetchCustomers, selectedSite, setSelectedSite } = useCrm();
+  const { customers, customersPagination, fetchCustomers, selectedSite, setSelectedSite , reference, sites} = useCrm();
 
   const [searchFilter, setSearchFilter] = useState('');
   const [recordTypeFilter, setRecordTypeFilter] = useState<string>('All');
@@ -87,20 +87,7 @@ export function CustomersView({
     setter(val);
   };
 
-  const SITES = [
-    'All Locations',
-    'BYD Nunawading',
-    'BYD Melbourne City',
-    'BYD Fairfield',
-    'BYD Caroline Springs',
-    'BYD Doncaster',
-    'Denza Melbourne',
-    'Holding Yard VIC',
-    'Nunawading',
-    'Fairfield',
-    'Melbourne City',
-    'Caroline Springs',
-  ];
+  const SITES = ['All Locations', ...sites];
 
   return (
     <div className="view-stack">
@@ -177,11 +164,7 @@ export function CustomersView({
             className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
           >
             <option value="All">All Lead Sources</option>
-            <option value="Virtual Yard">Virtual Yard</option>
-            <option value="Lead Centre">Lead Centre</option>
-            <option value="Showroom Walk-in">Showroom Walk-in</option>
-            <option value="Website">Official Website</option>
-            <option value="Direct Intake">Direct Intake / BDC</option>
+            {reference.sources.map(source => <option key={source} value={source}>{source}</option>)}
           </select>
         </div>
 
@@ -194,9 +177,7 @@ export function CustomersView({
               className="text-xs p-1.5 px-2.5 rounded-lg border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
             >
               <option value="All">All Assigned Consultants</option>
-              <option value="Alex Rivers">Alex Rivers</option>
-              <option value="Sarah Chen">Sarah Chen</option>
-              <option value="Marcus Vance">Marcus Vance</option>
+              {reference.consultants.map(name => <option key={name} value={name}>{name}</option>)}
             </select>
 
             {hasActiveFilters && (
@@ -316,7 +297,7 @@ export function CustomersView({
                     ) : (
                       <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono font-semibold text-[10px] inline-flex items-center gap-1">
                         <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                        <span>Consented</span>
+                        <span>{cust.consent_sms ? 'Consented' : 'Consent not recorded'}</span>
                       </span>
                     )}
                   </td>

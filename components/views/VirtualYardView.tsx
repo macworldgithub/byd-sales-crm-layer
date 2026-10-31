@@ -20,7 +20,7 @@ import { StockHoldModal } from '@/components/modals/StockHoldModal';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 
 export function VirtualYardView() {
-  const { vyStock, vyStockPagination, fetchVyStock, releaseStock, selectedSite, setSelectedSite, addToast } = useCrm();
+  const { vyStock, vyStockPagination, fetchVyStock, releaseStock, selectedSite, setSelectedSite, addToast , reference, sites} = useCrm();
 
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -59,12 +59,7 @@ export function VirtualYardView() {
       location: selectedSite !== 'All Sites' ? selectedSite : undefined,
       yard: selectedSite !== 'All Sites' ? selectedSite : undefined,
       site: selectedSite !== 'All Sites' ? selectedSite : undefined,
-    }).finally(() => {
-      setTimeout(() => {
-        setIsRefreshing(false);
-        addToast('success', 'Virtual Yard Synchronized', 'Polled latest stock changes and vessel ETA updates from VY API.');
-      }, 400);
-    });
+    }).then(success => { if (success) addToast('success', 'Inventory reloaded', 'Reloaded saved inventory from the backend.'); }).finally(() => setIsRefreshing(false));
   };
 
 
@@ -88,7 +83,7 @@ export function VirtualYardView() {
           </span>
           <h1 className="page-title mt-1">Virtual Yard Live Inventory</h1>
           <p className="page-subtitle">
-            Bidirectional synchronization with Virtual Yard stock ({vyStockPagination?.total?.toLocaleString() ?? '865'} active vehicles). Search inventory across yards, hold stock against active deals for 48 hours, and release on loss.
+            Saved Virtual Yard inventory ({vyStockPagination?.total?.toLocaleString() ?? '—'} records). Search inventory across yards and manage stock reservations.
           </p>
         </div>
 
@@ -142,12 +137,7 @@ export function VirtualYardView() {
             onChange={(e) => handleFilterChange('model', e.target.value)}
             className="w-full lg:w-auto text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none"
           >
-            <option value="All">All BYD Models</option>
-            {models.filter((m) => m !== 'All').map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
+            <option value="All">All models</option>{reference.models.map(model => <option key={model.name} value={model.name}>{model.name}</option>)}
           </select>
 
           <select
@@ -186,7 +176,7 @@ export function VirtualYardView() {
                 </h4>
                 <span className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                   <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />
-                  {stock.colour} · {stock.battery_kwh} kWh Battery
+                  {stock.colour || 'Colour not recorded'}{stock.battery_kwh != null ? ` · ${stock.battery_kwh} kWh Battery` : ''}
                 </span>
               </div>
 
@@ -238,7 +228,7 @@ export function VirtualYardView() {
                   Driveaway MSRP
                 </span>
                 <strong className="text-sm font-bold text-slate-900">
-                  ${stock.retail_price?.toLocaleString()}
+                  {stock.retail_price == null ? 'Price not recorded' : `$${stock.retail_price.toLocaleString()}`}
                 </strong>
               </div>
 

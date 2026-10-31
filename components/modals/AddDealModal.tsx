@@ -11,35 +11,38 @@ interface AddDealModalProps {
 }
 
 export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
-  const { customers, vyStock, selectedSite, addOpportunity, addToast } = useCrm();
+  const { customers, vyStock, selectedSite, addOpportunity, addToast, reference, sites, fetchReferenceData } = useCrm();
 
-  const [customerId, setCustomerId] = useState(customers[0]?.customer_id || '');
-  const [model, setModel] = useState('SEALION 7');
-  const [variant, setVariant] = useState('Premium AWD');
-  const [colour, setColour] = useState('Atlantis Grey');
+  const [customerId, setCustomerId] = useState('');
+  const [model, setModel] = useState('');
+  const [variant, setVariant] = useState('');
+  const [colour, setColour] = useState('');
   const [saleType, setSaleType] = useState<SaleType>('Retail');
   const [orderType, setOrderType] = useState<'Stock' | 'Factory Order'>('Stock');
   const [selectedStockId, setSelectedStockId] = useState('');
-  const [listPrice, setListPrice] = useState('65990');
-  const [discount, setDiscount] = useState('1000');
+  const [listPrice, setListPrice] = useState('');
+  const [discount, setDiscount] = useState('');
   const [extras, setExtras] = useState('0');
   const [stage, setStage] = useState<OpportunityStage>('Working');
   const [tradeInFlag, setTradeInFlag] = useState(false);
   const [tradeInMake, setTradeInMake] = useState('');
   const [tradeInValuation, setTradeInValuation] = useState('');
-  const [expectedClose, setExpectedClose] = useState(
-    new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0]
-  );
-
+  const [expectedClose, setExpectedClose] = useState('');
+  const [site, setSite] = useState(selectedSite === 'All Sites' ? '' : selectedSite);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  React.useEffect(() => { if (isOpen) void fetchReferenceData(); }, [isOpen, fetchReferenceData]);
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const lPrice = parseFloat(listPrice) || 60000;
+    const lPrice = parseFloat(listPrice) || 0;
     const dPrice = parseFloat(discount) || 0;
     const ePrice = parseFloat(extras) || 0;
 
-    addOpportunity({
+    setSaving(true); setSaveError('');
+    try { await addOpportunity({
+      site,
       customer_id: customerId,
       model,
       variant,
@@ -55,10 +58,9 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
       trade_in_flag: tradeInFlag,
       trade_in_details: tradeInFlag
         ? {
-            makeModel: tradeInMake || 'Trade-in Vehicle',
-            rego: 'TRADE-IN',
-            year: 2020,
-            valuation: parseFloat(tradeInValuation) || 15000,
+            makeModel: tradeInMake,
+            rego: '',
+            valuation: parseFloat(tradeInValuation) || 0,
             status: 'Pending',
           }
         : undefined,
@@ -66,16 +68,11 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
     });
 
     onClose();
+    } catch (error) { setSaveError(error instanceof Error ? error.message : 'The deal was not saved.'); }
+    finally { setSaving(false); }
   };
 
-  const models = [
-    { name: 'SEALION 7', defaultPrice: '65990', variants: ['Comfort RWD', 'Premium AWD', 'Performance Dual-Motor'] },
-    { name: 'SEAL', defaultPrice: '58798', variants: ['Dynamic RWD', 'Premium RWD', 'Performance AWD'] },
-    { name: 'ATTO 3', defaultPrice: '48990', variants: ['Standard Range', 'Extended Range'] },
-    { name: 'SHARK 6', defaultPrice: '57900', variants: ['Premium Dual-Cab 4WD'] },
-    { name: 'DOLPHIN', defaultPrice: '38890', variants: ['Dynamic', 'Premium'] },
-    { name: 'SEAGULL', defaultPrice: '32990', variants: ['Standard', 'Long Range'] },
-  ];
+  const models = reference.models;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
@@ -103,6 +100,8 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
+          {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
+          <label className="block text-xs font-semibold">Yard<select required className="block w-full border rounded-lg p-2 mt-1" value={site} onChange={event => setSite(event.target.value)}><option value="">Select yard</option>{sites.map(yard => <option key={yard} value={yard}>{yard}</option>)}</select></label>
           {/* Customer Selection */}
           <div>
             <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
@@ -110,9 +109,11 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
             </label>
             <select
               value={customerId}
+              required
               onChange={(e) => setCustomerId(e.target.value)}
               className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
             >
+              <option value="">Select customer</option>
               {customers.map((c) => (
                 <option key={c.customer_id} value={c.customer_id}>
                   {c.name} ({c.phone}) - {c.site}
@@ -129,17 +130,18 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
               </label>
               <select
                 value={model}
+                required
                 onChange={(e) => {
                   const m = e.target.value;
                   setModel(m);
                   const matched = models.find((mod) => mod.name === m);
                   if (matched) {
-                    setListPrice(matched.defaultPrice);
-                    setVariant(matched.variants[0]);
+                    setVariant('');
                   }
                 }}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
               >
+                <option value="">Select model</option>
                 {models.map((m) => (
                   <option key={m.name} value={m.name}>
                     {m.name}
@@ -157,6 +159,7 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
                 onChange={(e) => setVariant(e.target.value)}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
               >
+                <option value="">Select variant (optional)</option>
                 {models.find((m) => m.name === model)?.variants.map((v) => (
                   <option key={v} value={v}>
                     {v}
@@ -166,6 +169,7 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
             </div>
           </div>
 
+          <label className="block text-xs font-semibold">Colour (optional)<input className="block w-full border rounded-lg p-2 mt-1" value={colour} onChange={event => setColour(event.target.value)} list="deal-colours" /><datalist id="deal-colours">{(reference.models.find(item => item.name === model)?.colours || []).map(value => <option key={value} value={value} />)}</datalist></label>
           {/* Stock Link or Order Type */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -228,6 +232,7 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
               <input
                 type="number"
                 value={listPrice}
+                required min="0" step="0.01"
                 onChange={(e) => setListPrice(e.target.value)}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none font-semibold"
               />
@@ -298,7 +303,7 @@ export function AddDealModal({ isOpen, onClose }: AddDealModalProps) {
               Cancel
             </button>
             <button
-              type="submit"
+              type="submit" disabled={saving}
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs shadow-md shadow-red-600/20 font-mono uppercase tracking-wider text-center"
             >
               Register Opportunity

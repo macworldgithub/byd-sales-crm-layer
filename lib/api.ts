@@ -14,6 +14,7 @@ import {
   DeliveryHandoverWatch,
   PaginationMeta,
   CustomerDocument,
+  AuditLogEntry,
 } from './types';
 
 // Dynamic production URL resolution for VPS / production deployments
@@ -132,9 +133,37 @@ function buildQueryString(params?: Record<string, string | number | boolean | un
 }
 
 export const browseApi = {
-  list: <T,>(resource: 'leads' | 'opportunities' | 'calendar', params: Record<string, string | number | boolean | undefined>, signal?: AbortSignal) =>
+  list: <T,>(resource: 'leads' | 'opportunities' | 'calendar' | 'audit', params: Record<string, string | number | boolean | undefined>, signal?: AbortSignal) =>
     fetchApi<T[]>(`/crm/${resource}${buildQueryString(params)}`, { cache: 'no-store', signal }),
 };
+
+export interface CrmReferenceData {
+  sites: string[];
+  staff: { id: string; name: string; email: string; site: string; role: string; team: string }[];
+  models: { name: string; variants: string[]; colours: string[] }[];
+  smsTemplates: { id: string; name: string; body: string; category: string }[];
+  inventoryCount: number;
+  consultants: string[];
+  sources: string[];
+  links: { leadCentre: string; deliveryCentre: string };
+}
+export const runtimeApi = {
+  bootstrap: (site?: string) => fetchApi<CrmReferenceData>(`/crm/bootstrap${buildQueryString({ site })}`, { cache: 'no-store' }),
+  health: () => fetchApi<any>('/health', { cache: 'no-store' }),
+  audit: (site?: string, customer_id?: string) => fetchApi<AuditLogEntry[]>(`/crm/audit${buildQueryString({ site, customer_id })}`, { cache: 'no-store' }),
+  reports: (site?: string) => fetchApi<{ customers: number; opportunities: number; sales: number; optOuts: number; gross: number | null; reconciled: number }>(`/crm/reports/summary${buildQueryString({ site })}`, { cache: 'no-store' }),
+  governance: () => fetchApi<any>('/crm/settings/governance', { cache: 'no-store' }),
+  saveGovernance: (value: { slaTimeoutMinutes: number; stockHoldHours: number }) => fetchApi<any>('/crm/settings/governance', { method: 'POST', body: JSON.stringify(value) }),
+  requestLeads: (site?: string) => fetchApi<any>('/crm/lead-requests', { method: 'POST', body: JSON.stringify({ site }) }),
+  logCall: (customerId: string, details: Record<string, unknown>) => fetchApi<any>(`/crm/customers/${encodeURIComponent(customerId)}/calls`, { method: 'POST', body: JSON.stringify(details) }),
+};
+
+export async function downloadAuthenticated(url: string, filename: string) {
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}`, 'X-Site': typeof window !== 'undefined' ? localStorage.getItem('byd_crm_site') || '' : '' }, cache: 'no-store' });
+  if (!response.ok) throw new Error('The export could not be generated.');
+  const blob = await response.blob(), link = document.createElement('a'), objectUrl = URL.createObjectURL(blob);
+  link.href = objectUrl; link.download = filename; link.click(); URL.revokeObjectURL(objectUrl);
+}
 
 // ─── CRM Customers API ───────────────────────────────────────────────────────
 export const customerApi = {
@@ -446,10 +475,10 @@ export const inboundQueueApi = {
 
 // ─── Dynamic Scoreboards & Targets API ───────────────────────────────────────
 export const boardApi = {
-  getBoardMe: () => fetchApi<any>('/crm/boards/me'),
-  getBoardTeam: () => fetchApi<any>('/crm/boards/team'),
+  getBoardMe: (params?: Record<string, string | undefined>) => fetchApi<any>(`/crm/boards/me${buildQueryString(params)}`),
+  getBoardTeam: (params?: Record<string, string | undefined>) => fetchApi<any>(`/crm/boards/team${buildQueryString(params)}`),
   getTargets: () => fetchApi<any>('/crm/targets'),
-  updateTarget: (payload: { period?: string; targetUnitCount: number; targetRevenue?: number }) =>
+  updateTarget: (payload: { consultant?: string; site?: string; period?: string; targetUnits?: number; targetUnitCount?: number }) =>
     fetchApi<any>('/crm/targets', { method: 'POST', body: JSON.stringify(payload) }),
 };
 

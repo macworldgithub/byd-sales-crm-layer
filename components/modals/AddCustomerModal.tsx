@@ -12,7 +12,7 @@ interface AddCustomerModalProps {
 }
 
 export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCustomerModalProps) {
-  const { customers, selectedSite, addCustomer } = useCrm();
+  const { customers, selectedSite, addCustomer, sites } = useCrm();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -20,10 +20,13 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
   const [recordType, setRecordType] = useState<CustomerRecordType>('Individual');
   const [companyName, setCompanyName] = useState('');
   const [site, setSite] = useState<SiteLocation>(
-    selectedSite !== 'All Sites' ? selectedSite : 'Fairfield'
+    selectedSite !== 'All Sites' ? selectedSite : ''
   );
   const [source, setSource] = useState<'Walk-in' | 'Carsales' | 'Virtual Yard' | 'Autogate' | 'Web'>('Walk-in');
   const [notes, setNotes] = useState('');
+  const [consentSms, setConsentSms] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   if (!isOpen) return null;
 
@@ -50,18 +53,22 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
       formattedPhone = '+61' + formattedPhone;
     }
 
-    await addCustomer({
+    setSaving(true); setSaveError('');
+    try { await addCustomer({
       name: name.trim(),
       phone: formattedPhone,
-      email: email.trim() || `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+      email: email.trim(),
       record_type: recordType,
       company_name: companyName.trim() || undefined,
       site,
       source,
       notes: notes.trim(),
+      consent_sms: consentSms,
     });
 
     onClose();
+    } catch (error) { setSaveError(error instanceof Error ? error.message : 'Customer was not saved.'); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -116,6 +123,7 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
+          {saveError && <p role="alert" className="text-red-700 text-sm">{saveError}</p>}
           <div>
             <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
               Full Name or Contact Person *
@@ -123,7 +131,7 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
             <input
               type="text"
               required
-              placeholder="e.g. Sarah Mitchell"
+              placeholder="Full name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
@@ -153,7 +161,7 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
               </label>
               <input
                 type="email"
-                placeholder="sarah.m@example.com"
+                placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
@@ -184,15 +192,12 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
               </label>
               <select
                 value={site}
+                required
                 onChange={(e) => setSite(e.target.value as SiteLocation)}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
               >
-                <option value="Fairfield">Fairfield</option>
-                <option value="Melbourne City">Melbourne City</option>
-                <option value="Doncaster">Doncaster</option>
-                <option value="Nunawading">Nunawading</option>
-                <option value="Caroline Springs">Caroline Springs</option>
-                <option value="Denza Melbourne">Denza Melbourne</option>
+                <option value="">Select yard</option>
+                {sites.map(yard => <option key={yard} value={yard}>{yard}</option>)}
               </select>
             </div>
           </div>
@@ -204,7 +209,7 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
               </label>
               <input
                 type="text"
-                placeholder="e.g. Apex Logistics Pty Ltd"
+                placeholder="Company name"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
@@ -242,6 +247,7 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
             />
           </div>
 
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={consentSms} onChange={event => setConsentSms(event.target.checked)} />SMS consent has been provided</label>
           <div className="pt-2 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3">
             <button
               type="button"
@@ -251,7 +257,7 @@ export function AddCustomerModal({ isOpen, onClose, onSelectExisting }: AddCusto
               Cancel
             </button>
             <button
-              type="submit"
+              type="submit" disabled={saving}
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs shadow-md shadow-red-600/20 font-mono uppercase tracking-wider text-center"
             >
               Create Customer Record

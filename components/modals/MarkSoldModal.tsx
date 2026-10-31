@@ -31,7 +31,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
   const [primarySalesperson, setPrimarySalesperson] = useState(currentUser.name);
   const [secondarySalesperson, setSecondarySalesperson] = useState('');
   const [splitPercent, setSplitPercent] = useState('100');
-  const [deposit, setDeposit] = useState('2000');
+  const [deposit, setDeposit] = useState('');
   const [financeMethod, setFinanceMethod] = useState('Finance');
   const [isFactoryOrder, setIsFactoryOrder] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -295,7 +295,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="e.g. Harrison Reed"
+                  placeholder="Consultant name"
                   value={secondarySalesperson}
                   onChange={(e) => setSecondarySalesperson(e.target.value)}
                   className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 outline-none"

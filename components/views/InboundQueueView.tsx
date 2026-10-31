@@ -261,7 +261,7 @@ export function InboundQueueView() {
                     {entry.sales_log_id || entry.deal_number}
                   </span>
                   <span className="text-xs font-bold text-slate-700">
-                    {entry.site || 'Fairfield'}
+                    {entry.site || '—'}
                   </span>
                 </div>
                 <h4 className="text-sm font-bold text-slate-900">

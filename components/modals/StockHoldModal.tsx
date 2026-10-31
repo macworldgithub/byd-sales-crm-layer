@@ -17,11 +17,10 @@ export function StockHoldModal({ isOpen, onClose, stock }: StockHoldModalProps) 
 
   if (!isOpen || !stock) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOppId) return;
-    holdStock(stock.stock_id, selectedOppId);
-    onClose();
+    if (await holdStock(stock.stock_id, selectedOppId)) onClose();
   };
 
   return (
@@ -86,7 +85,7 @@ export function StockHoldModal({ isOpen, onClose, stock }: StockHoldModalProps) 
             <div>
               <strong className="block font-bold">48-Hour Complimentary Hold Window</strong>
               <p className="text-[11px] text-purple-800 leading-relaxed mt-0.5">
-                The stock unit will be locked against this deal across all Harmony sites in Virtual Yard. If not converted to written deal within 48 hours, the hold will automatically lapse.
+                The reservation is recorded against this deal. Its expiry follows the current stock reservation configuration.
               </p>
             </div>
           </div>

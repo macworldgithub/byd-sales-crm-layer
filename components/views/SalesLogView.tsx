@@ -15,10 +15,11 @@ import {
 } from 'lucide-react';
 import { useCrm } from '@/lib/crmContext';
 import { SalesLogEntry } from '@/lib/types';
+import { recordedTotal } from '@/lib/liveData';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 
 export function SalesLogView() {
-  const { salesLog, salesLogPagination, fetchSalesLog, reconcileSalesLogRow, addToast, selectedSite, setSelectedSite } = useCrm();
+  const { salesLog, salesLogPagination, fetchSalesLog, reconcileSalesLogRow, addToast, selectedSite, setSelectedSite , reference, sites} = useCrm();
 
   const [searchFilter, setSearchFilter] = useState('');
   const [reconciledFilter, setReconciledFilter] = useState('All');
@@ -28,18 +29,11 @@ export function SalesLogView() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [showMappingModal, setShowMappingModal] = useState(false);
+  const [savedMapping, setSavedMapping] = useState<Record<string, string> | null>(null);
   const [columnMappings, setColumnMappings] = useState({
-    contractNo: 'Agreement_No',
-    contractDate: 'Contract_Date',
-    buyerName: 'Purchaser_Name',
-    vehicleDesc: 'Model_Description',
-    chassisVin: 'Chassis_VIN',
-    stockRef: 'Stock_Ref',
-    transType: 'Sale_Type_Category',
-    repName: 'Sales_Consultant_Name',
-    siteLoc: 'Dealership_Location',
-    invoicedAud: 'Total_Invoiced_AUD',
-    grossMargin: 'Deal_Gross_Profit',
+    contractNo: '', contractDate: '', buyerName: '', vehicleDesc: '',
+    chassisVin: '', stockRef: '', transType: '', repName: '', siteLoc: '',
+    invoicedAud: '', grossMargin: '',
   });
 
   // Sync siteFilter with global selectedSite
@@ -53,18 +47,20 @@ export function SalesLogView() {
     import('@/lib/api').then(({ syncApi }) => {
       syncApi.getFieldMapping().then((res) => {
         if (res.success && res.data) {
+          setSavedMapping(res.data);
           setColumnMappings((prev) => ({
             ...prev,
-            contractNo: res.data.deal_number || prev.contractNo,
-            contractDate: res.data.deal_date || prev.contractDate,
-            buyerName: res.data.customer_name || prev.buyerName,
-            vehicleDesc: res.data.vehicle || prev.vehicleDesc,
-            chassisVin: res.data.vin || prev.chassisVin,
-            stockRef: res.data.stock_id || prev.stockRef,
-            transType: res.data.sale_type || prev.transType,
-            repName: res.data.salesperson || prev.repName,
-            invoicedAud: res.data.amount || prev.invoicedAud,
-            grossMargin: res.data.gross || prev.grossMargin,
+            contractNo: res.data.deal_number ?? res.data.contractNo ?? '',
+            contractDate: res.data.deal_date ?? res.data.contractDate ?? '',
+            buyerName: res.data.customer_name ?? res.data.buyerName ?? '',
+            vehicleDesc: res.data.vehicle ?? res.data.vehicleDesc ?? '',
+            chassisVin: res.data.vin ?? res.data.chassisVin ?? '',
+            stockRef: res.data.stock_id ?? res.data.stockRef ?? '',
+            transType: res.data.sale_type ?? res.data.transType ?? '',
+            repName: res.data.consultant_name ?? res.data.salesperson ?? res.data.repName ?? '',
+            siteLoc: res.data.site ?? res.data.siteLoc ?? '',
+            invoicedAud: res.data.amount ?? res.data.list_price ?? res.data.invoicedAud ?? '',
+            grossMargin: res.data.gross ?? res.data.gross_margin ?? res.data.grossMargin ?? '',
           }));
         }
       });
@@ -95,8 +91,8 @@ export function SalesLogView() {
       !entry.vin ||
       entry.vin === 'TBA' ||
       entry.vin.length < 10 ||
-      entry.amount < 1000 ||
-      (!entry.reconciled && (entry.deal_date.includes('Aug') || entry.deal_date.includes('2026-08')))
+      (entry.amount != null && entry.amount < 1000) ||
+      !entry.reconciled
     );
   };
 
@@ -134,32 +130,18 @@ export function SalesLogView() {
     setCurrentPage(1);
   };
 
-  const SITES = [
-    'All Locations',
-    'BYD Nunawading',
-    'BYD Melbourne City',
-    'BYD Fairfield',
-    'BYD Caroline Springs',
-    'BYD Doncaster',
-    'Denza Melbourne',
-    'Holding Yard VIC',
-    'Nunawading',
-    'Fairfield',
-    'Melbourne City',
-    'Caroline Springs',
-  ];
+  const SITES = ['All Locations', ...sites];
 
-  const totalWrittenAmount = filteredSalesLog.reduce((sum, s) => sum + s.amount, 0);
-  const totalWrittenGross = filteredSalesLog.reduce((sum, s) => sum + (s.gross || 0), 0);
+  const totalWrittenAmount = recordedTotal(filteredSalesLog.map(s => s.amount));
+  const totalWrittenGross = recordedTotal(filteredSalesLog.map(s => s.gross));
 
   const handleReconcileAll = async () => {
     try {
       const { syncApi } = await import('@/lib/api');
-      await syncApi.reconcileAll(selectedSite !== 'All Sites' ? selectedSite : undefined);
-      salesLog.forEach((row) => {
-        if (!row.reconciled) reconcileSalesLogRow(row.sales_log_id);
-      });
-      addToast('success', 'Reconciliation Batch Complete', 'All unreconciled Sales Log rows matched and persisted to database.');
+      const result = await syncApi.reconcileAll(selectedSite !== 'All Sites' ? selectedSite : undefined);
+      if (!result.success) throw new Error(result.message || 'Reconciliation failed.');
+      await fetchSalesLog({ site: selectedSite !== 'All Sites' ? selectedSite : undefined, page: currentPage, limit: pageSize });
+      addToast('success', 'Reconciliation Batch Complete', `${result.data?.count ?? 0} saved rows processed.`);
     } catch (err: any) {
       addToast('error', 'Reconcile Failed', err.message || 'Could not complete batch reconciliation.');
     }
@@ -170,7 +152,7 @@ export function SalesLogView() {
     const rows = filteredSalesLog
       .map(
         (s) =>
-          `"${s.sales_log_id}","${s.deal_date}","${s.customer_name}","${s.vehicle}","${s.vin}","${s.stock_id}","${s.sale_type}","${s.consultant}","${s.site}",${s.amount},${s.gross || 0},${s.reconciled}`
+          `"${s.sales_log_id}","${s.deal_date}","${s.customer_name}","${s.vehicle}","${s.vin}","${s.stock_id}","${s.sale_type}","${s.consultant}","${s.site}",${s.amount ?? ''},${s.gross ?? ''},${s.reconciled}`
       )
       .join('\n');
 
@@ -251,10 +233,10 @@ export function SalesLogView() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
-            Total Written Value (MTD)
+            Displayed sales value
           </span>
           <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
-            ${totalWrittenAmount.toLocaleString()}
+            {totalWrittenAmount == null ? '—' : `$${totalWrittenAmount.toLocaleString()}`}
           </div>
           <span className="text-[11px] text-slate-500 mt-0.5 block">
             {filteredSalesLog.length} contracts written in CRM
@@ -263,13 +245,13 @@ export function SalesLogView() {
 
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
-            Total Gross Revenue (Estimated)
+            Displayed recorded gross profit
           </span>
           <div className="text-2xl font-bold text-emerald-600 mt-1 font-mono">
-            ${totalWrittenGross.toLocaleString()}
+            {totalWrittenGross == null ? '—' : `$${totalWrittenGross.toLocaleString()}`}
           </div>
           <span className="text-[11px] text-slate-500 mt-0.5 block">
-            Average margin ~{((totalWrittenGross / (totalWrittenAmount || 1)) * 100).toFixed(1)}%
+            Recorded margin: {totalWrittenGross == null || !totalWrittenAmount ? '—' : `${(totalWrittenGross / totalWrittenAmount * 100).toFixed(1)}%`}
           </span>
         </div>
 
@@ -330,9 +312,7 @@ export function SalesLogView() {
             className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
           >
             <option value="All">All Consultants</option>
-            <option value="Alex Rivers">Alex Rivers</option>
-            <option value="Sarah Chen">Sarah Chen</option>
-            <option value="Marcus Vance">Marcus Vance</option>
+              {reference.consultants.map(name => <option key={name} value={name}>{name}</option>)}
           </select>
         </div>
 
@@ -416,10 +396,10 @@ export function SalesLogView() {
                     <td className="py-3.5 px-4 text-slate-700">{row.consultant}</td>
                     <td className="py-3.5 px-4 text-slate-600">{row.site}</td>
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                      ${row.amount.toLocaleString()}
+                      {row.amount == null ? '—' : `$${row.amount.toLocaleString()}`}
                     </td>
                     <td className="py-3.5 px-4 font-mono text-emerald-600 font-bold">
-                      ${(row.gross || 0).toLocaleString()}
+                      {row.gross == null ? '—' : `$${row.gross.toLocaleString()}`}
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       {row.reconciled ? (
@@ -622,14 +602,24 @@ export function SalesLogView() {
                   onClick={async () => {
                     try {
                       const { syncApi } = await import('@/lib/api');
-                      await syncApi.saveFieldMapping(columnMappings);
+                      const mapping = { ...savedMapping,
+                        deal_number: columnMappings.contractNo, deal_date: columnMappings.contractDate,
+                        customer_name: columnMappings.buyerName, vehicle: columnMappings.vehicleDesc,
+                        vin: columnMappings.chassisVin, stock_id: columnMappings.stockRef,
+                        sale_type: columnMappings.transType, salesperson: columnMappings.repName,
+                        site: columnMappings.siteLoc, amount: columnMappings.invoicedAud, gross: columnMappings.grossMargin,
+                      };
+                      const result = await syncApi.saveFieldMapping(mapping);
+                      if (!result.success) throw new Error(result.message || 'Unable to save mapping.');
+                      setSavedMapping(mapping);
                       setShowMappingModal(false);
-                      addToast('success', 'Mapping Schema Saved', 'Harmony column mappings persisted to database for automated nightly reconcile.');
+                      addToast('success', 'Mapping Schema Saved', 'Column mappings saved to the database.');
                     } catch (err: any) {
                       addToast('error', 'Save Failed', err.message || 'Could not save mapping schema.');
                     }
                   }}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono uppercase tracking-wider"
+                  disabled={!savedMapping}
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs font-mono uppercase tracking-wider disabled:opacity-50"
                 >
                   Save Mapping Schema
                 </button>

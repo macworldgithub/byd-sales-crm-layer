@@ -1,6 +1,14 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, {
+  useRef,
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from 'react';
 import {
   Customer,
   Opportunity,
@@ -17,22 +25,22 @@ import {
   UserProfile,
   PaginationMeta,
 } from './types';
-import {
-  CURRENT_USER,
-  ALL_USERS,
-  INITIAL_CUSTOMERS,
-  INITIAL_OPPORTUNITIES,
-  INITIAL_TIMELINE_EVENTS,
-  INITIAL_ALLOCATIONS,
-  INITIAL_VY_STOCK,
-  INITIAL_SALES_LOG,
-  INITIAL_DELIVERY_WATCH,
-  INITIAL_APPOINTMENTS,
-  INITIAL_AUDIT_LOG,
-  CONSULTANT_SCORES,
-} from './data';
 import { confirmDealSold } from './dealActions';
-import { customerApi, opportunityApi, allocationApi, vyApi, syncApi, crmMessageApi, authApi, boardApi, appointmentApi, getToken, getLockedSite } from './api';
+import {
+  customerApi,
+  opportunityApi,
+  allocationApi,
+  vyApi,
+  syncApi,
+  crmMessageApi,
+  authApi,
+  boardApi,
+  appointmentApi,
+  runtimeApi,
+  CrmReferenceData,
+  getToken,
+  getLockedSite,
+} from './api';
 
 export interface ToastMessage {
   id: string;
@@ -41,18 +49,10 @@ export interface ToastMessage {
   description?: string;
 }
 
-export const ALL_SITES_AND_YARDS: SiteLocation[] = [
-  'All Sites',
-  'BYD Melbourne City',
-  'BYD Caroline Springs',
-  'BYD Nunawading',
-  'BYD Fairfield',
-  'Denza Melbourne',
-  'Holding Yard VIC',
-  'BYD Doncaster',
-];
-
-export function matchesSite(recordSiteOrYard?: string | null, targetSite?: string | null): boolean {
+export function matchesSite(
+  recordSiteOrYard?: string | null,
+  targetSite?: string | null
+): boolean {
   if (
     !targetSite ||
     targetSite === 'All Sites' ||
@@ -77,10 +77,10 @@ export function matchesSite(recordSiteOrYard?: string | null, targetSite?: strin
   const cleanRecord = normalize(recordSiteOrYard);
 
   if (cleanTarget === cleanRecord) return true;
-  if (cleanRecord.includes(cleanTarget) || cleanTarget.includes(cleanRecord)) return true;
+  if (cleanRecord.includes(cleanTarget) || cleanTarget.includes(cleanRecord))
+    return true;
   return false;
 }
-
 
 interface CrmContextType {
   // Current Session & Tenancy
@@ -93,6 +93,11 @@ interface CrmContextType {
   currentRole: UserRole;
   setCurrentRole: (role: UserRole) => void;
   isOnline: boolean;
+  reference: CrmReferenceData;
+  sites: string[];
+  fetchReferenceData: () => Promise<boolean>;
+  dataErrors: Record<string, string>;
+  refreshAll: () => Promise<void>;
 
   // Data Collections (Filtered by Site where applicable)
   customers: Customer[];
@@ -116,28 +121,46 @@ interface CrmContextType {
   appointmentsPagination?: PaginationMeta;
 
   // Pagination Fetch Triggers
-  fetchVyStock: (params?: Record<string, any>) => Promise<void>;
-  fetchCustomers: (params?: Record<string, any>) => Promise<void>;
-  fetchOpportunities: (params?: Record<string, any>) => Promise<void>;
-  fetchAllocations: (params?: Record<string, any>) => Promise<void>;
-  fetchSalesLog: (params?: Record<string, any>) => Promise<void>;
-  fetchDeliveryWatch: (params?: Record<string, any>) => Promise<void>;
-  fetchAppointments: (params?: Record<string, any>) => Promise<void>;
+  fetchVyStock: (params?: Record<string, any>) => Promise<boolean>;
+  fetchCustomers: (params?: Record<string, any>) => Promise<boolean>;
+  fetchOpportunities: (params?: Record<string, any>) => Promise<boolean>;
+  fetchAllocations: (params?: Record<string, any>) => Promise<boolean>;
+  fetchSalesLog: (params?: Record<string, any>) => Promise<boolean>;
+  fetchDeliveryWatch: (params?: Record<string, any>) => Promise<boolean>;
+  fetchAppointments: (params?: Record<string, any>) => Promise<boolean>;
 
   // Actions: Customer & 360
   addCustomer: (data: Partial<Customer>) => Promise<Customer>;
   updateCustomer: (customerId: string, patch: Partial<Customer>) => void;
-  mergeCustomers: (sourceId: string, targetId: string) => void;
-  unlinkCustomer: (customerId: string, linkType?: 'lead' | 'delivery' | 'all') => Promise<void>;
+  mergeCustomers: (sourceId: string, targetId: string) => Promise<boolean>;
+  unlinkCustomer: (
+    customerId: string,
+    linkType?: 'lead' | 'delivery' | 'all'
+  ) => Promise<void>;
   toggleOptOut: (customerId: string) => void;
-  addTimelineNote: (customerId: string, content: string, opportunityId?: string) => void;
-  addTimelineEmail: (customerId: string, email: { subject: string; body: string; to?: string; direction?: string }) => Promise<void>;
+  addTimelineNote: (
+    customerId: string,
+    content: string,
+    opportunityId?: string
+  ) => Promise<boolean>;
+  addTimelineEmail: (
+    customerId: string,
+    email: { subject: string; body: string; to?: string; direction?: string }
+  ) => Promise<void>;
   fetchCustomerTimeline: (customerId: string) => Promise<void>;
+  fetchCustomerAudit: (customerId: string) => Promise<void>;
 
   // Actions: Deals & Opportunities
-  addOpportunity: (data: Partial<Opportunity>) => Opportunity;
-  updateOpportunityStage: (opportunityId: string, newStage: OpportunityStage, reason?: string) => void;
-  updateOpportunity: (opportunityId: string, patch: Partial<Opportunity>) => void;
+  addOpportunity: (data: Partial<Opportunity>) => Promise<Opportunity>;
+  updateOpportunityStage: (
+    opportunityId: string,
+    newStage: OpportunityStage,
+    reason?: string
+  ) => void;
+  updateOpportunity: (
+    opportunityId: string,
+    patch: Partial<Opportunity>
+  ) => void;
   executeMarkSold: (
     opportunityId: string,
     soldDetails: {
@@ -154,17 +177,24 @@ interface CrmContextType {
   ) => Promise<{ success: boolean; message: string }>;
 
   // Actions: Lead Intake & Phone Logging (§5.3, §5.9)
-  createAllocation: (data: Record<string, any>) => Promise<AllocationItem | null>;
+  createAllocation: (
+    data: Record<string, any>
+  ) => Promise<AllocationItem | null>;
   acceptAllocation: (allocationId: string) => void;
   reassignAllocation: (allocationId: string, targetConsultant: string) => void;
   requestMoreLeads: () => void;
   logPhoneCall: (
     customerId: string,
-    details: { outcome: string; durationMinutes: number; notes: string; opportunityId?: string }
-  ) => void;
+    details: {
+      outcome: string;
+      durationMinutes: number;
+      notes: string;
+      opportunityId?: string;
+    }
+  ) => Promise<boolean>;
 
   // Actions: Virtual Yard Push/Pull (§5.6)
-  holdStock: (stockId: string, opportunityId: string) => void;
+  holdStock: (stockId: string, opportunityId: string) => Promise<boolean>;
   releaseStock: (stockId: string) => void;
 
   // Actions: Sales Log Reconcile (§5.7)
@@ -172,11 +202,19 @@ interface CrmContextType {
 
   // Actions: Delivery Handover (§5.8)
   addDeliveryHandoverNote: (clientId: string, note: string) => void;
-  requestDeliveryDateChange: (clientId: string, requestedDate: string, reason: string) => Promise<void>;
+  requestDeliveryDateChange: (
+    clientId: string,
+    requestedDate: string,
+    reason: string
+  ) => Promise<void>;
 
   // Actions: Appointments & Targets (§5.5, §5.9)
   createAppointment: (appt: Partial<Appointment>) => Promise<Appointment>;
-  updateConsultantTarget: (consultantName: string, newTarget: number) => void;
+  updateConsultantTarget: (
+    consultantName: string,
+    newTarget: number,
+    site?: string
+  ) => Promise<boolean>;
 
   // Scoreboards & Monthly Quotas
   boardMe?: any;
@@ -184,1239 +222,727 @@ interface CrmContextType {
   fetchScoreboards: () => Promise<void>;
 
   // Actions: SMS Messaging (§5.9)
-  sendSmsMessage: (customerId: string, phone: string, message: string) => Promise<boolean>;
+  sendSmsMessage: (
+    customerId: string,
+    phone: string,
+    message: string
+  ) => Promise<boolean>;
 
   // Toasts
   toasts: ToastMessage[];
-  addToast: (type: ToastMessage['type'], title: string, description?: string) => void;
+  addToast: (
+    type: ToastMessage['type'],
+    title: string,
+    description?: string
+  ) => void;
   removeToast: (id: string) => void;
 }
 
 const CrmContext = createContext<CrmContextType | undefined>(undefined);
 
 export function CrmProvider({ children }: { children: ReactNode }) {
-  // Session & Tenancy
-  const [currentUser, setCurrentUser] = useState<UserProfile>(CURRENT_USER);
-  const [selectedSite, setSelectedSiteState] = useState<SiteLocation>('All Sites');
-  const [lockedSite, setLockedSite] = useState<string>('');
-  const [currentRole, setCurrentRole] = useState<UserRole>('super_admin');
-  const [isOnline, setIsOnline] = useState(true);
-
-  // Load saved yard/site from localStorage on mount (a site-locked login always wins)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const locked = getLockedSite();
-      setLockedSite(locked);
-      if (locked) {
-        setSelectedSiteState(locked as SiteLocation);
-        return;
-      }
-      const saved = localStorage.getItem('byd_crm_site');
-      if (saved) {
-        setSelectedSiteState(saved as SiteLocation);
-      }
-    }
-  }, []);
-
-  const setSelectedSite = useCallback((site: SiteLocation) => {
-    // Re-read the lock from the token so a fresh login is honoured immediately
-    const locked = getLockedSite();
-    setLockedSite(locked);
-    if (locked) {
-      setSelectedSiteState(locked as SiteLocation);
-      return;
-    }
-    setSelectedSiteState(site);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('byd_crm_site', site);
-    }
-  }, []);
-
-
-  // Core Data
-  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(INITIAL_OPPORTUNITIES);
-  const [allocations, setAllocations] = useState<AllocationItem[]>(INITIAL_ALLOCATIONS);
-  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>(INITIAL_TIMELINE_EVENTS);
-  const [vyStock, setVyStock] = useState<VirtualYardStock[]>(INITIAL_VY_STOCK);
-  const [salesLog, setSalesLog] = useState<SalesLogEntry[]>(INITIAL_SALES_LOG);
-  const [deliveryWatch, setDeliveryWatch] = useState<DeliveryHandoverWatch[]>(INITIAL_DELIVERY_WATCH);
-  const [appointments, setAppointments] = useState<Appointment[]>(INITIAL_APPOINTMENTS);
-  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>(INITIAL_AUDIT_LOG);
-
-  // Pagination states (§9 Production Scale)
-  const [vyStockPagination, setVyStockPagination] = useState<PaginationMeta | undefined>({
-    total: INITIAL_VY_STOCK.length,
-    page: 1,
-    limit: 20,
-    pages: Math.ceil(INITIAL_VY_STOCK.length / 20) || 1,
-    hasNextPage: false,
-    hasPrevPage: false,
+  const [currentUser, setCurrentUser] = useState<UserProfile>({
+    id: '',
+    name: '',
+    email: '',
+    role: 'consultant',
+    site: '',
+    team: '',
+    avatarInitials: '',
   });
-  const [customersPagination, setCustomersPagination] = useState<PaginationMeta | undefined>();
-  const [opportunitiesPagination, setOpportunitiesPagination] = useState<PaginationMeta | undefined>();
-  const [allocationsPagination, setAllocationsPagination] = useState<PaginationMeta | undefined>();
-  const [salesLogPagination, setSalesLogPagination] = useState<PaginationMeta | undefined>();
-  const [deliveryWatchPagination, setDeliveryWatchPagination] = useState<PaginationMeta | undefined>();
-  const [appointmentsPagination, setAppointmentsPagination] = useState<PaginationMeta | undefined>();
-
-  // Fetch functions with pagination parameters
-  const fetchVyStock = useCallback(async (params: Record<string, any> = {}) => {
-    try {
-      const res = await vyApi.getStock(params);
-      if (res.success && res.data) {
-        setVyStock(res.data);
-        if (res.pagination) setVyStockPagination(res.pagination);
-      }
-    } catch (err) {
-      console.warn('fetchVyStock error:', err);
-    }
-  }, []);
-
-  const fetchCustomers = useCallback(async (params: Record<string, any> = {}) => {
-    try {
-      const res = await customerApi.getCustomers(params);
-      if (res.success && res.data) {
-        setCustomers(res.data);
-        if (res.pagination) setCustomersPagination(res.pagination);
-      }
-    } catch (err) {
-      console.warn('fetchCustomers error:', err);
-    }
-  }, []);
-
-  const fetchOpportunities = useCallback(async (params: Record<string, any> = {}) => {
-    try {
-      const res = await opportunityApi.getOpportunities(params);
-      if (res.success && res.data) {
-        setOpportunities(res.data);
-        if (res.pagination) setOpportunitiesPagination(res.pagination);
-      }
-    } catch (err) {
-      console.warn('fetchOpportunities error:', err);
-    }
-  }, []);
-
-  const fetchAllocations = useCallback(async (params: Record<string, any> = {}) => {
-    try {
-      const res = await allocationApi.getAllocations(params);
-      if (res.success && res.data) {
-        setAllocations(res.data);
-        if (res.pagination) setAllocationsPagination(res.pagination);
-      }
-    } catch (err) {
-      console.warn('fetchAllocations error:', err);
-    }
-  }, []);
-
-  const fetchSalesLog = useCallback(async (params: Record<string, any> = {}) => {
-    try {
-      const res = await syncApi.getSalesLog(params);
-      if (res.success && res.data) {
-        setSalesLog(res.data);
-        if (res.pagination) setSalesLogPagination(res.pagination);
-      }
-    } catch (err) {
-      console.warn('fetchSalesLog error:', err);
-    }
-  }, []);
-
-  const fetchDeliveryWatch = useCallback(async (params: Record<string, any> = {}) => {
-    try {
-      const res = await syncApi.getDeliveryWatch(params);
-      if (res.success && res.data) {
-        const querySite = params.site || params.yard || params.location || (selectedSite !== 'All Sites' ? selectedSite : undefined);
-        const mapped = res.data.map((item: any) => ({
-          ...item,
-          site: item.site || (item.location ? (item.location.toLowerCase().includes('nunawading') ? 'BYD Nunawading' : item.location) : querySite) || 'BYD Nunawading',
-          location: item.location || item.site || querySite || 'Nunawading, VIC',
-        }));
-        setDeliveryWatch(mapped);
-        if (res.pagination) setDeliveryWatchPagination(res.pagination);
-      }
-    } catch (err) {
-      console.warn('fetchDeliveryWatch error:', err);
-    }
-  }, [selectedSite]);
-
-  const fetchAppointments = useCallback(async (params: Record<string, any> = {}) => {
-    try {
-      const res = await appointmentApi.getAppointments(params);
-      if (res.success && Array.isArray(res.data)) {
-        const mapped: Appointment[] = res.data.map((a: any) => ({
-          appointment_id: a.appointment_id || a.appointmentId || a.id || `APT-${a._id}`,
-          customer_id: a.customer_id || a.leadId || '',
-          customer_name: a.customer_name || a.prospectName || 'Customer',
-          phone: a.phone || '',
-          type: a.type || 'Test Drive',
-          when: a.when || a.testDriveDate || new Date().toISOString(),
-          duration_minutes: a.duration_minutes || a.durationMinutes || 45,
-          vehicle: a.vehicle || 'BYD SEALION 7',
-          loop: a.loop || 'CBD Demo Loop',
-          consultant: a.consultant || a.consultantName || a.bookedBy || 'Consultant',
-          site: (a.site || a.dealership || a.location || 'Fairfield') as SiteLocation,
-          status: a.status || 'Confirmed',
-          notes: a.notes || '',
-          virtualyardSync: a.virtualyardSync,
-        }));
-        setAppointments(mapped);
-        if (res.pagination) setAppointmentsPagination(res.pagination);
-      }
-    } catch (err) {
-      console.warn('fetchAppointments error:', err);
-    }
-  }, []);
-
-  // Toasts
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-  const addToast = useCallback((type: ToastMessage['type'], title: string, description?: string) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, type, title, description }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4500);
-  }, []);
-
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  // Online / Offline listener
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsOnline(navigator.onLine);
-      const onOnline = () => {
-        setIsOnline(true);
-        addToast('success', 'Back Online', 'Re-established connection to byd-panel event bus.');
-      };
-      const onOffline = () => {
-        setIsOnline(false);
-        addToast('warning', 'Yard Offline Mode', 'Actions will queue locally with full data protection.');
-      };
-      window.addEventListener('online', onOnline);
-      window.addEventListener('offline', onOffline);
-      return () => {
-        window.removeEventListener('online', onOnline);
-        window.removeEventListener('offline', onOffline);
-      };
-    }
-  }, [addToast]);
-
-  // Keep currentUser role and currentRole synchronized
-  const handleSetRole = (role: UserRole) => {
-    setCurrentRole(role);
-  };
-
+  const [selectedSite, setSelectedSiteState] =
+    useState<SiteLocation>('All Sites');
+  const [lockedSite, setLockedSite] = useState('');
+  const [currentRole, setCurrentRole] = useState<UserRole>('consultant');
+  const [isOnline, setIsOnline] = useState(false);
+  const [reference, setReference] = useState<CrmReferenceData>({
+    sites: [],
+    staff: [],
+    models: [],
+    smsTemplates: [],
+    inventoryCount: 0,
+    consultants: [],
+    sources: [],
+    links: { leadCentre: '', deliveryCentre: '' },
+  });
+  const [dataErrors, setDataErrors] = useState<Record<string, string>>({});
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [allocations, setAllocations] = useState<AllocationItem[]>([]);
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
+  const [vyStock, setVyStock] = useState<VirtualYardStock[]>([]);
+  const [salesLog, setSalesLog] = useState<SalesLogEntry[]>([]);
+  const [deliveryWatch, setDeliveryWatch] = useState<DeliveryHandoverWatch[]>(
+    []
+  );
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+  const [vyStockPagination, setVyStockPagination] = useState<PaginationMeta>();
+  const [customersPagination, setCustomersPagination] =
+    useState<PaginationMeta>();
+  const [opportunitiesPagination, setOpportunitiesPagination] =
+    useState<PaginationMeta>();
+  const [allocationsPagination, setAllocationsPagination] =
+    useState<PaginationMeta>();
+  const [salesLogPagination, setSalesLogPagination] =
+    useState<PaginationMeta>();
+  const [deliveryWatchPagination, setDeliveryWatchPagination] =
+    useState<PaginationMeta>();
+  const [appointmentsPagination, setAppointmentsPagination] =
+    useState<PaginationMeta>();
   const [boardMe, setBoardMe] = useState<any>(null);
   const [boardTeam, setBoardTeam] = useState<any>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const sequence = useRef<Record<string, number>>({});
+  const sessionScope = `${currentUser.id}:${selectedSite}`;
+  const scopeRef = useRef(sessionScope);
+  scopeRef.current = sessionScope;
+  const site = selectedSite !== 'All Sites' ? selectedSite : undefined;
 
-  const fetchScoreboards = useCallback(async () => {
-    try {
-      const [meRes, teamRes] = await Promise.allSettled([
-        boardApi.getBoardMe(),
-        boardApi.getBoardTeam(),
-      ]);
-      if (meRes.status === 'fulfilled' && meRes.value.success) {
-        setBoardMe(meRes.value.data);
-      }
-      if (teamRes.status === 'fulfilled' && teamRes.value.success) {
-        setBoardTeam(teamRes.value.data);
-      }
-    } catch (err) {
-      console.warn('fetchScoreboards error:', err);
-    }
+  const setSelectedSite = useCallback((value: SiteLocation) => {
+    const lock = getLockedSite();
+    setLockedSite(lock);
+    const next = lock || value;
+    setSelectedSiteState(next);
+    if (typeof window !== 'undefined')
+      localStorage.setItem('byd_crm_site', next);
   }, []);
-
-  // Live Backend Sync on Mount (§7.1, §7.3)
   useEffect(() => {
-    if (typeof window !== 'undefined' && getToken()) {
-      fetchScoreboards();
+    if (typeof window === 'undefined') return;
+    const lock = getLockedSite();
+    setLockedSite(lock);
+    setSelectedSiteState(
+      lock || localStorage.getItem('byd_crm_site') || 'All Sites'
+    );
+  }, []);
+  const addToast = useCallback(
+    (type: ToastMessage['type'], title: string, description?: string) => {
+      const id = crypto.randomUUID();
+      setToasts((old) => [...old, { id, type, title, description }]);
+      setTimeout(
+        () => setToasts((old) => old.filter((toast) => toast.id !== id)),
+        4500
+      );
+    },
+    []
+  );
+  const removeToast = (id: string) =>
+    setToasts((old) => old.filter((toast) => toast.id !== id));
+  function must<T>(
+    response: { success: boolean; data?: T; message?: string },
+    requireData = true
+  ): T {
+    if (!response.success || (requireData && response.data === undefined))
+      throw new Error(
+        response.message || 'The request could not be completed.'
+      );
+    return response.data as T;
+  }
+  const load = useCallback(
+    async (
+      name: string,
+      request: () => Promise<any>,
+      setRows: (rows: any) => void,
+      setPagination?: (pagination: PaginationMeta | undefined) => void
+    ) => {
+      const ticket = (sequence.current[name] =
+        (sequence.current[name] || 0) + 1);
+      const scope = scopeRef.current;
+      try {
+        const response = await request();
+        if (scope !== scopeRef.current || ticket !== sequence.current[name])
+          return false;
+        const rows = must(response);
+        setRows(rows);
+        setPagination?.(response.pagination);
+        setDataErrors((old) => {
+          const next = { ...old };
+          delete next[name];
+          return next;
+        });
+        return true;
+      } catch (error) {
+        if (scope !== scopeRef.current || ticket !== sequence.current[name])
+          return false;
+        setRows([]);
+        setPagination?.(undefined);
+        setDataErrors((old) => ({
+          ...old,
+          [name]:
+            error instanceof Error ? error.message : 'Unable to load data.',
+        }));
+        return false;
+      }
+    },
+    []
+  );
+  const fetchCustomers = useCallback(
+    async (params = {}) => {
+      return await load(
+        'Customers',
+        () => customerApi.getCustomers(params),
+        setCustomers,
+        setCustomersPagination
+      );
+    },
+    [load]
+  );
+  const fetchOpportunities = useCallback(
+    async (params = {}) => {
+      return await load(
+        'Deals',
+        () => opportunityApi.getOpportunities(params),
+        setOpportunities,
+        setOpportunitiesPagination
+      );
+    },
+    [load]
+  );
+  const fetchAllocations = useCallback(
+    async (params = {}) => {
+      return await load(
+        'Allocations',
+        () => allocationApi.getAllocations(params),
+        setAllocations,
+        setAllocationsPagination
+      );
+    },
+    [load]
+  );
+  const fetchVyStock = useCallback(
+    async (params = {}) => {
+      return await load(
+        'Stock',
+        () => vyApi.getStock(params),
+        setVyStock,
+        setVyStockPagination
+      );
+    },
+    [load]
+  );
+  const fetchSalesLog = useCallback(
+    async (params = {}) => {
+      return await load(
+        'Sales Log',
+        () => syncApi.getSalesLog(params),
+        setSalesLog,
+        setSalesLogPagination
+      );
+    },
+    [load]
+  );
+  const fetchDeliveryWatch = useCallback(
+    async (params = {}) => {
+      return await load(
+        'Deliveries',
+        () => syncApi.getDeliveryWatch(params),
+        setDeliveryWatch,
+        setDeliveryWatchPagination
+      );
+    },
+    [load]
+  );
+  const mapAppointment = (a: any): Appointment => ({
+    appointment_id: String(
+      a.id || a._id || a.appointment_id || a.appointmentId
+    ),
+    customer_id: a.customer_id || a.leadId || '',
+    customer_name: a.customer_name || a.prospectName || '',
+    phone: a.phone || '',
+    type: a.type || 'Test Drive',
+    when: a.when || a.testDriveDate || '',
+    duration_minutes: a.duration_minutes ?? a.durationMinutes,
+    vehicle: a.vehicle || '',
+    loop: a.loop || '',
+    consultant: a.consultant || a.consultantName || a.bookedBy || '',
+    site: a.site || a.dealership || a.location || '',
+    status: a.status || '',
+    notes: a.notes || '',
+    virtualyardSync: a.virtualyardSync,
+  });
+  const fetchAppointments = useCallback(
+    async (params = {}) => {
+      return await load(
+        'Appointments',
+        () => appointmentApi.getAppointments(params),
+        (rows) => setAppointments(rows.map(mapAppointment)),
+        setAppointmentsPagination
+      );
+    },
+    [load]
+  );
+  const fetchReferenceData = useCallback(async () => {
+    const scope = scopeRef.current;
+    try {
+      const data = must(await runtimeApi.bootstrap(site));
+      if (scope !== scopeRef.current) return false;
+      setReference(data);
+      setDataErrors((old) => {
+        const next = { ...old };
+        delete next.Reference;
+        return next;
+      });
+      return true;
+    } catch (error) {
+      if (scope === scopeRef.current) {
+        setReference({
+          sites: [],
+          staff: [],
+          models: [],
+          smsTemplates: [],
+          inventoryCount: 0,
+          consultants: [],
+          sources: [],
+          links: { leadCentre: '', deliveryCentre: '' },
+        });
+        setDataErrors((old) => ({
+          ...old,
+          Reference:
+            error instanceof Error
+              ? error.message
+              : 'Unable to load reference data.',
+        }));
+      }
+      return false;
     }
-  }, [fetchScoreboards]);
-
-  // Synchronize collections whenever selectedSite / yard / department changes
+  }, [site]);
+  const fetchScoreboards = useCallback(async () => {
+    const requests: Promise<unknown>[] = [
+      load('Your scoreboard', () => boardApi.getBoardMe({ site }), setBoardMe),
+    ];
+    if (['manager', 'site_admin', 'super_admin', 'bdc'].includes(currentRole))
+      requests.push(
+        load(
+          'Team scoreboard',
+          () => boardApi.getBoardTeam({ site }),
+          setBoardTeam
+        )
+      );
+    else setBoardTeam(null);
+    await Promise.all(requests);
+  }, [load, site, currentRole]);
+  const refreshAll = useCallback(async () => {
+    await Promise.all([
+      fetchReferenceData(),
+      fetchScoreboards(),
+      fetchCustomers({ limit: 50, site }),
+      fetchOpportunities({ limit: 50, site }),
+      fetchAllocations({ limit: 50, site }),
+      fetchVyStock({ limit: 20, site }),
+      fetchSalesLog({ limit: 50, site }),
+      fetchDeliveryWatch({ limit: 20, site }),
+      fetchAppointments({ limit: 50, timeframe: 'Today', site }),
+    ]);
+  }, [
+    fetchReferenceData,
+    fetchScoreboards,
+    fetchCustomers,
+    fetchOpportunities,
+    fetchAllocations,
+    fetchVyStock,
+    fetchSalesLog,
+    fetchDeliveryWatch,
+    fetchAppointments,
+    site,
+  ]);
   useEffect(() => {
-    if (typeof window === 'undefined' || !getToken()) return;
-    const siteParam = selectedSite !== 'All Sites' ? selectedSite : undefined;
-    const query = siteParam ? { site: siteParam, yard: siteParam, location: siteParam } : {};
-    fetchCustomers({ page: 1, limit: 50, ...query });
-    fetchOpportunities({ page: 1, limit: 50, ...query });
-    fetchAllocations({ page: 1, limit: 50, ...query });
-    fetchVyStock({ page: 1, limit: 20, ...query });
-    fetchSalesLog({ page: 1, limit: 50, ...query });
-    fetchDeliveryWatch({ page: 1, limit: 20, ...query });
-    fetchAppointments({ limit: 50, ...query });
-  }, [selectedSite, fetchCustomers, fetchOpportunities, fetchAllocations, fetchVyStock, fetchSalesLog, fetchDeliveryWatch, fetchAppointments]);
-
-
-  // Add Customer with Live Database Duplicate Detection (§5.1 & AC-1)
+    setCustomers([]);
+    setOpportunities([]);
+    setAllocations([]);
+    setVyStock([]);
+    setSalesLog([]);
+    setDeliveryWatch([]);
+    setAppointments([]);
+    setTimelineEvents([]);
+    setAuditLog([]);
+    setBoardMe(null);
+    setBoardTeam(null);
+    setDataErrors({});
+    if (currentUser.id && getToken()) void refreshAll();
+  }, [sessionScope, refreshAll]);
+  useEffect(() => {
+    const check = async () => {
+      const response = await runtimeApi.health();
+      setIsOnline(
+        response.success === true &&
+          (response.data?.databases || (response as any).databases)
+            ?.leadCenter === 'connected' &&
+          (response.data?.databases || (response as any).databases)
+            ?.deliveryCenter === 'connected'
+      );
+    };
+    void check();
+    const timer = setInterval(check, 60000);
+    const offline = () => setIsOnline(false);
+    window.addEventListener('online', check);
+    window.addEventListener('offline', offline);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('online', check);
+      window.removeEventListener('offline', offline);
+    };
+  }, []);
+  const run = async (
+    title: string,
+    request: () => Promise<any>,
+    after?: (data: any) => unknown | Promise<unknown>
+  ) => {
+    try {
+      const response = await request();
+      const data = must(response, false);
+      await after?.(data);
+      addToast('success', title, response.message || 'Saved to the server.');
+      return true;
+    } catch (error) {
+      addToast(
+        'error',
+        title + ' failed',
+        error instanceof Error ? error.message : 'Please try again.'
+      );
+      return false;
+    }
+  };
+  const actualSite = (requested?: string) => {
+    const value = requested || site || currentUser.site;
+    if (!value || /^all(?:\s|$)/i.test(value))
+      throw new Error('Select a yard before saving.');
+    return value;
+  };
+  const fetchCustomerTimeline = async (id: string) => {
+    await load(
+      'Timeline',
+      () => customerApi.getTimeline(id, { paginate: 'false' }),
+      (rows) =>
+        setTimelineEvents((old) => [
+          ...rows,
+          ...old.filter((event) => event.customer_id !== id),
+        ])
+    );
+  };
+  const fetchCustomerAudit = async (id: string) => {
+    await load(
+      'Customer activity',
+      () => runtimeApi.audit(site, id),
+      setAuditLog
+    );
+  };
   const addCustomer = async (data: Partial<Customer>): Promise<Customer> => {
     try {
-      const res = await customerApi.createCustomer({
-        ...data,
-        owner_user_id: currentUser.id,
-        owner_name: currentUser.name,
-        site: (data.site || (selectedSite !== 'All Sites' ? selectedSite : 'Fairfield')) as SiteLocation,
-      });
-
-      if (res.success && res.data) {
-        const created = res.data;
-        setCustomers((prev) => [created, ...prev]);
-
-        // Add Audit Log
-        const newAudit: AuditLogEntry = {
-          audit_id: `AUD-${Date.now().toString().slice(-4)}`,
-          actor: currentUser.name,
-          action: 'Customer Created',
-          target_type: 'Customer',
-          target_id: created.customer_id,
-          details: `Created customer profile for ${created.name} (${created.phone}) in database`,
-          source: 'Sales CRM',
-          timestamp: new Date().toISOString(),
-        };
-        setAuditLog((prev) => [newAudit, ...prev]);
-
-        addToast('success', 'Customer 360 Record Created', `${created.name} saved to ${created.site} database.`);
-        return created;
-      } else if (res.message && res.message.includes('Duplicate')) {
-        addToast('warning', 'Duplicate Customer Detected', res.message);
-        throw new Error(res.message);
-      }
-    } catch (err: any) {
-      if (err.message && err.message.includes('Duplicate')) {
-        throw err;
-      }
-      console.warn('API addCustomer offline fallback:', err);
+      const created = must(
+        await customerApi.createCustomer({
+          ...data,
+          site: actualSite(data.site),
+          owner_user_id: currentUser.id,
+          owner_name: currentUser.name,
+        })
+      );
+      setCustomers((old) => [created, ...old]);
+      addToast('success', 'Customer saved');
+      return created;
+    } catch (error) {
+      addToast(
+        'error',
+        'Customer not saved',
+        error instanceof Error ? error.message : 'Please try again.'
+      );
+      throw error;
     }
-
-    // Resilient offline fallback
-    const customerId = `CUST-${Math.floor(1000 + Math.random() * 9000)}`;
-    const fallbackCust: Customer = {
-      customer_id: customerId,
-      name: data.name || 'New Customer',
-      phone: data.phone || '+61400000000',
-      email: data.email || 'customer@example.com',
-      site: (data.site || (selectedSite !== 'All Sites' ? selectedSite : 'Fairfield')) as SiteLocation,
-      owner_user_id: currentUser.id,
-      owner_name: currentUser.name,
-      source: data.source || 'Walk-in',
-      record_type: data.record_type || 'Individual',
-      company_name: data.company_name,
-      consent_sms: true,
-      consent_updated_at: new Date().toISOString(),
-      do_not_contact: false,
-      notes: data.notes || '',
-      created_at: new Date().toISOString(),
-      total_open_value: 0,
-      current_stage: 'New / Allocated',
-    };
-
-    setCustomers((prev) => [fallbackCust, ...prev]);
-
-    const newAudit: AuditLogEntry = {
-      audit_id: `AUD-${Date.now().toString().slice(-4)}`,
-      actor: currentUser.name,
-      action: 'Customer Created (Offline)',
-      target_type: 'Customer',
-      target_id: customerId,
-      details: `Created customer profile for ${fallbackCust.name} (${fallbackCust.phone})`,
-      source: 'Sales CRM',
-      timestamp: new Date().toISOString(),
-    };
-    setAuditLog((prev) => [newAudit, ...prev]);
-
-    addToast('success', 'Customer 360 Record Created', `${fallbackCust.name} cached.`);
-    return fallbackCust;
   };
-
-  const updateCustomer = async (customerId: string, patch: Partial<Customer>) => {
-    setCustomers((prev) =>
-      prev.map((c) => (c.customer_id === customerId ? { ...c, ...patch } : c))
+  const updateCustomer = (id: string, patch: Partial<Customer>) =>
+    run(
+      'Customer update',
+      () => customerApi.updateCustomer(id, patch),
+      () => fetchCustomers({ site, limit: 50 })
     );
-    try {
-      await customerApi.updateCustomer(customerId, patch);
-    } catch (err) {
-      console.warn('updateCustomer api error:', err);
+  const mergeCustomers = (sourceId: string, targetId: string) =>
+    run(
+      'Customer merge',
+      () => customerApi.mergeCustomers(sourceId, targetId),
+      refreshAll
+    );
+  const unlinkCustomer = async (
+    id: string,
+    type: 'lead' | 'delivery' | 'all' = 'delivery'
+  ) => {
+    if (
+      !(await run(
+        'Customer unlink',
+        () => customerApi.unlinkCustomer(id, type),
+        refreshAll
+      ))
+    )
+      throw new Error('Unlink was not saved.');
+  };
+  const toggleOptOut = async (id: string) => {
+    const response = await customerApi.getCustomer(id);
+    if (!response.success || !response.data) {
+      addToast('error', 'Unable to load consent', response.message);
+      return;
     }
-    addToast('info', 'Customer Profile Updated', 'Changes saved to customer record.');
+    await updateCustomer(id, {
+      do_not_contact: !response.data.do_not_contact,
+      consent_sms: response.data.do_not_contact,
+    });
   };
-
-  // Merge Customers (§5.1)
-  const mergeCustomers = async (sourceId: string, targetId: string) => {
-    const source = customers.find((c) => c.customer_id === sourceId);
-    const target = customers.find((c) => c.customer_id === targetId);
-    if (!source || !target) return;
-
-    // Migrate opportunities & timeline events in local state
-    setOpportunities((prev) =>
-      prev.map((o) =>
-        o.customer_id === sourceId
-          ? { ...o, customer_id: targetId, customer_name: target.name }
-          : o
-      )
+  const addTimelineNote = (
+    id: string,
+    content: string,
+    opportunityId?: string
+  ) =>
+    run(
+      'Note saved',
+      () =>
+        customerApi.addTimelineNote(id, {
+          content,
+          opportunityId,
+          author: currentUser.name,
+        } as any),
+      () => fetchCustomerTimeline(id)
     );
-    setTimelineEvents((prev) =>
-      prev.map((e) => (e.customer_id === sourceId ? { ...e, customer_id: targetId } : e))
-    );
-    // Remove source customer
-    setCustomers((prev) => prev.filter((c) => c.customer_id !== sourceId));
-
-    try {
-      await customerApi.mergeCustomers(sourceId, targetId);
-    } catch (err) {
-      console.warn('mergeCustomers api error:', err);
-    }
-
-    // Audit
-    const audit: AuditLogEntry = {
-      audit_id: `AUD-${Date.now().toString().slice(-4)}`,
-      actor: currentUser.name,
-      action: 'Customer Records Merged',
-      target_type: 'Customer',
-      target_id: targetId,
-      details: `Merged duplicate record ${source.name} (${sourceId}) into ${target.name} (${targetId}) in database`,
-      source: 'Sales CRM',
-      timestamp: new Date().toISOString(),
-    };
-    setAuditLog((prev) => [audit, ...prev]);
-
-    addToast(
-      'success',
-      'Duplicate Merged Successfully',
-      `All deals and history from ${source.name} unified into record ${target.name}.`
-    );
-  };
-
-  // Unlink Customer Record (§5.10 & Gap Remediation)
-  const unlinkCustomer = async (customerId: string, linkType: 'lead' | 'delivery' | 'all' = 'delivery') => {
-    try {
-      await customerApi.unlinkCustomer(customerId, linkType);
-    } catch (err) {
-      console.warn('unlinkCustomer api error:', err);
-    }
-
-    const targetCust = customers.find((c) => c.customer_id === customerId);
-    const custName = targetCust ? targetCust.name : customerId;
-
-    // Record Audit & Timeline
-    const audit: AuditLogEntry = {
-      audit_id: `AUD-${Date.now().toString().slice(-4)}`,
-      actor: currentUser.name,
-      action: 'Customer Record Unlinked',
-      target_type: 'Customer',
-      target_id: customerId,
-      details: `Unlinked mismatched ${linkType} record association for customer ${custName}.`,
-      source: 'Sales CRM',
-      timestamp: new Date().toISOString(),
-    };
-    setAuditLog((prev) => [audit, ...prev]);
-
-    const timelineEvt: TimelineEvent = {
-      event_id: `EVT-${Date.now().toString().slice(-4)}`,
-      customer_id: customerId,
-      occurred_at: 'Just now (AEST)',
-      source: 'Sales CRM',
-      type: 'system',
-      author: currentUser.name,
-      title: `Association Unlinked (${linkType.toUpperCase()})`,
-      content: `Disassociated mismatched ${linkType} record from customer profile by ${currentUser.name}.`,
-      visibility: 'internal',
-    };
-    setTimelineEvents((prev) => [timelineEvt, ...prev]);
-
-    addToast(
-      'success',
-      'Record Unlinked',
-      `Successfully detached ${linkType} record association for ${custName}.`
-    );
-  };
-
-  // Global ACMA Opt-out / Do Not Contact (§5.10 & AC-5)
-  const toggleOptOut = async (customerId: string) => {
-    const target = customers.find((c) => c.customer_id === customerId);
-    if (!target) return;
-    const updatedState = !target.do_not_contact;
-
-    setCustomers((prev) =>
-      prev.map((c) => {
-        if (c.customer_id === customerId) {
-          return {
-            ...c,
-            do_not_contact: updatedState,
-            consent_sms: !updatedState,
-            consent_updated_at: new Date().toISOString(),
-          };
-        }
-        return c;
-      })
-    );
-
-    try {
-      await customerApi.updateCustomer(customerId, {
-        do_not_contact: updatedState,
-        consent_sms: !updatedState,
-      });
-    } catch (err) {
-      console.warn('toggleOptOut api error:', err);
-    }
-
-    const newStatus = updatedState ? 'Opted Out' : 'Resumed';
-
-    // Broadcast Timeline Event
-    const optOutEvent: TimelineEvent = {
-      event_id: `EVT-${Date.now().toString().slice(-4)}`,
-      customer_id: customerId,
-      occurred_at: 'Just now (AEST)',
-      source: 'Sales CRM',
-      type: 'system',
-      author: currentUser.name,
-      title: `ACMA Compliance: Contact Status changed to ${newStatus}`,
-      content: `Global opt-out synchronized across Lead Centre and Delivery Centre. Outbound SMS disabled.`,
-      visibility: 'internal',
-    };
-    setTimelineEvents((prev) => [optOutEvent, ...prev]);
-
-    addToast(
-      'warning',
-      'ACMA Compliance Event Logged',
-      `Customer marked as ${newStatus}. Synced to upstream Lead Centre.`
-    );
-  };
-
-  // Add Unified Timeline Note (§5.2 & AC-2)
-  const addTimelineNote = async (customerId: string, content: string, opportunityId?: string) => {
-    const newEvent: TimelineEvent = {
-      event_id: `EVT-${Date.now().toString().slice(-4)}`,
-      customer_id: customerId,
-      opportunity_id: opportunityId,
-      occurred_at: 'Just now (AEST)',
-      source: 'Sales CRM',
-      type: 'note',
-      author: `${currentUser.name} (${currentUser.role})`,
-      title: 'Sales Consultation Note',
-      content,
-      visibility: 'internal',
-    };
-
-    setTimelineEvents((prev) => [newEvent, ...prev]);
-
-    // Note also saved on customer object
-    setCustomers((prev) =>
-      prev.map((c) =>
-        c.customer_id === customerId
-          ? { ...c, notes: c.notes ? `${c.notes}\n[${new Date().toLocaleDateString()}] ${content}` : content }
-          : c
-      )
-    );
-
-    try {
-      await customerApi.addTimelineNote(customerId, {
-        author: `${currentUser.name} (${currentUser.role})`,
-        content,
-      });
-    } catch (err) {
-      console.warn('addTimelineNote api error:', err);
-    }
-
-    addToast(
-      'success',
-      'Note Recorded & Fanned Out',
-      'Note visible on Lead Centre timeline and Delivery Centre client thread.'
-    );
-  };
-
-  // Add Unified Timeline Email (§5.9)
   const addTimelineEmail = async (
-    customerId: string,
+    id: string,
     email: { subject: string; body: string; to?: string; direction?: string }
   ) => {
-    const newEvent: TimelineEvent = {
-      event_id: `EVT-EML-${Date.now().toString().slice(-4)}`,
-      customer_id: customerId,
-      occurred_at: 'Just now (AEST)',
-      source: 'Sales CRM',
-      type: 'email',
-      author: `${currentUser.name} (${currentUser.role})`,
-      title: email.subject || 'Customer Email Communication',
-      content: email.body,
-      visibility: 'internal',
-    };
-
-    setTimelineEvents((prev) => [newEvent, ...prev]);
-
-    try {
-      await customerApi.addTimelineEmail(customerId, {
-        author: currentUser.name,
-        subject: email.subject,
-        body: email.body,
-        to: email.to,
-        direction: email.direction || 'outbound',
-      });
-    } catch (err) {
-      console.warn('addTimelineEmail api error:', err);
-    }
-
-    addToast('success', 'Email Logged to Timeline', 'Email recorded on customer 360 unified timeline.');
+    if (
+      !(await run(
+        'Email log saved',
+        () =>
+          customerApi.addTimelineEmail(id, {
+            ...email,
+            author: currentUser.name,
+          }),
+        () => fetchCustomerTimeline(id)
+      ))
+    )
+      throw new Error('Email log was not saved.');
   };
-
-  // Fetch Customer Timeline from MongoDB (§5.2)
-  const fetchCustomerTimeline = async (customerId: string) => {
+  const addOpportunity = async (
+    data: Partial<Opportunity>
+  ): Promise<Opportunity> => {
     try {
-      const res = await customerApi.getTimeline(customerId, { paginate: "false" });
-      if (res.success && res.data) {
-        setTimelineEvents((prev) => [
-          ...res.data!, ...prev.filter(e => e.customer_id !== customerId),
-        ]);
-      }
-    } catch (err) {
-      console.warn('fetchCustomerTimeline error:', err);
+      const created = must(
+        await opportunityApi.createOpportunity({
+          ...data,
+          site: actualSite(data.site),
+          owner_user_id: currentUser.id,
+          owner_name: currentUser.name,
+          total_deal_value:
+            Number(data.list_price || 0) -
+            Number(data.discount || 0) +
+            Number(data.extras || 0),
+        })
+      );
+      const saved = must(
+        await opportunityApi.getOpportunity(created.opportunity_id)
+      );
+      setOpportunities((old) => [saved, ...old]);
+      addToast('success', 'Deal saved');
+      return saved;
+    } catch (error) {
+      addToast(
+        'error',
+        'Deal not saved',
+        error instanceof Error ? error.message : 'Please try again.'
+      );
+      throw error;
     }
   };
-
-  // Opportunities Management (§5.4)
-  const addOpportunity = (data: Partial<Opportunity>): Opportunity => {
-    const cust = customers.find((c) => c.customer_id === data.customer_id);
-    const tempOppId = `OPP-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    const newOpp: Opportunity = {
-      opportunity_id: tempOppId,
-      customer_id: data.customer_id || 'CUST-0891',
-      customer_name: cust?.name || data.customer_name || 'Customer',
-      customer_phone: cust?.phone || '+61400000000',
-      customer_email: cust?.email || 'email@example.com',
-      site: (data.site || (selectedSite !== 'All Sites' ? selectedSite : 'Fairfield')) as SiteLocation,
-      owner_user_id: currentUser.id,
-      owner_name: currentUser.name,
-      stage: data.stage || 'New / Allocated',
-      vehicle_descriptor: data.vehicle_descriptor || 'BYD SEALION 7 Premium',
-      model: data.model || 'SEALION 7',
-      variant: data.variant || 'Premium',
-      colour: data.colour || 'Atlantis Grey',
-      order_type: data.order_type || 'Stock',
-      vy_stock_id: data.vy_stock_id,
-      sale_type: data.sale_type || 'Retail',
-      list_price: data.list_price || 65990,
-      discount: data.discount || 0,
-      extras: data.extras || 0,
-      total_deal_value: (data.list_price || 65990) - (data.discount || 0) + (data.extras || 0),
-      trade_in_flag: data.trade_in_flag || false,
-      trade_in_details: data.trade_in_details,
-      expected_close: data.expected_close || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-      next_action_at: new Date(Date.now() + 86400000).toISOString(),
-      next_action_text: data.next_action_text || 'Follow up vehicle preference and trade valuation',
-      sync_status: 'synced',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    setOpportunities((prev) => [newOpp, ...prev]);
-
-    // Persist to MongoDB Atlas via backend API
-    opportunityApi
-      .createOpportunity({
-        ...data,
-        customer_name: newOpp.customer_name,
-        customer_phone: newOpp.customer_phone,
-        customer_email: newOpp.customer_email,
-        site: newOpp.site,
-        owner_user_id: currentUser.id,
-        owner_name: currentUser.name,
-      })
-      .then((res) => {
-        if (res.success && res.data) {
-          const savedOpp = res.data;
-          setOpportunities((prev) =>
-            prev.map((o) => (o.opportunity_id === tempOppId ? { ...o, ...savedOpp } : o))
-          );
-        }
-      })
-      .catch((err) => {
-        console.warn('createOpportunity API error:', err);
-      });
-
-    // Update customer active deal
-    setCustomers((prev) =>
-      prev.map((c) =>
-        c.customer_id === newOpp.customer_id
-          ? {
-              ...c,
-              total_open_value: (c.total_open_value || 0) + newOpp.total_deal_value,
-              current_stage: newOpp.stage,
-              active_deal_id: newOpp.opportunity_id,
-            }
-          : c
-      )
+  const updateOpportunity = (id: string, patch: Partial<Opportunity>) =>
+    run(
+      'Deal update',
+      () => opportunityApi.updateOpportunity(id, patch),
+      refreshAll
     );
-
-    // Audit
-    const audit: AuditLogEntry = {
-      audit_id: `AUD-${Date.now().toString().slice(-4)}`,
-      actor: currentUser.name,
-      action: 'Opportunity Created',
-      target_type: 'Opportunity',
-      target_id: tempOppId,
-      details: `Created deal for ${newOpp.vehicle_descriptor} ($${newOpp.total_deal_value.toLocaleString()})`,
-      source: 'Sales CRM',
-      timestamp: new Date().toISOString(),
-    };
-    setAuditLog((prev) => [audit, ...prev]);
-
-    addToast('success', 'Opportunity Registered', `${newOpp.vehicle_descriptor} created for ${newOpp.customer_name}.`);
-    return newOpp;
-  };
-
-  const updateOpportunityStage = async (
-    opportunityId: string,
-    newStage: OpportunityStage,
+  const updateOpportunityStage = (
+    id: string,
+    stage: OpportunityStage,
     reason?: string
-  ) => {
-    setOpportunities((prev) =>
-      prev.map((o) => {
-        if (o.opportunity_id === opportunityId) {
-          return {
-            ...o,
-            stage: newStage,
-            lost_reason: newStage === 'Lost / Parked' ? (reason as any) : undefined,
-            updated_at: new Date().toISOString(),
-          };
-        }
-        return o;
-      })
-    );
-
-    try {
-      await opportunityApi.updateOpportunity(opportunityId, {
-        stage: newStage,
-        lost_reason: reason as any,
-      });
-    } catch (err) {
-      console.warn('updateOpportunityStage api error:', err);
-    }
-
-    const opp = opportunities.find((o) => o.opportunity_id === opportunityId);
-
-    // Timeline event
-    if (opp) {
-      const stageEvt: TimelineEvent = {
-        event_id: `EVT-${Date.now().toString().slice(-4)}`,
-        customer_id: opp.customer_id,
-        opportunity_id: opp.opportunity_id,
-        occurred_at: 'Just now (AEST)',
-        source: 'Sales CRM',
-        type: 'stage_change',
-        author: currentUser.name,
-        title: `Deal Stage Transition: ${opp.stage} › ${newStage}`,
-        content: `Opportunity ${opp.opportunity_id} (${opp.vehicle_descriptor}) moved to ${newStage}.${
-          reason ? ` Reason: ${reason}` : ''
-        }`,
-        visibility: 'internal',
-      };
-      setTimelineEvents((prev) => [stageEvt, ...prev]);
-    }
-
-    addToast('info', 'Pipeline Stage Updated', `Deal moved to ${newStage}.`);
-  };
-
-  const updateOpportunity = async (opportunityId: string, patch: Partial<Opportunity>) => {
-    setOpportunities((prev) =>
-      prev.map((o) => (o.opportunity_id === opportunityId ? { ...o, ...patch, updated_at: new Date().toISOString() } : o))
-    );
-    try {
-      await opportunityApi.updateOpportunity(opportunityId, patch);
-    } catch (err) {
-      console.warn('updateOpportunity api error:', err);
-    }
-    addToast('info', 'Opportunity Saved', 'Deal details updated.');
-  };
-
-  // Single Orchestrated Mark Sold Transaction (§7.5 & AC-7)
+  ) => updateOpportunity(id, { stage, loss_reason: reason } as any);
   const executeMarkSold = async (
-    opportunityId: string,
-    soldDetails: {
-      vin: string;
-      vy_stock_id?: string;
-      vy_order_id?: string;
-      sale_type: Opportunity['sale_type'];
-      primary_salesperson: string;
-      secondary_salesperson?: string;
-      deposit: number;
-      finance_method?: string;
-      is_factory_order?: boolean;
-    }
-  ): Promise<{ success: boolean; message: string }> => {
+    id: string,
+    details: Parameters<typeof opportunityApi.markSold>[1]
+  ) => {
     try {
-      const result = await confirmDealSold(opportunityId, soldDetails);
-      setOpportunities(prev => [result.opportunity, ...prev.filter(opp => opp.opportunity_id !== opportunityId)]);
-      const site = selectedSite === 'All Sites' ? undefined : selectedSite;
-      await Promise.allSettled([
-        fetchOpportunities({ page: 1, limit: 50, site }),
-        fetchSalesLog({ page: 1, limit: 50, site }),
-        fetchDeliveryWatch({ page: 1, limit: 20, site }),
-        fetchVyStock({ page: 1, limit: 20, site }),
-      ]);
-      addToast(result.deliverySyncPending ? 'info' : 'success', 'Deal marked as sold', result.message);
+      const result = await confirmDealSold(id, details);
+      await refreshAll();
+      addToast(
+        result.deliverySyncPending ? 'info' : 'success',
+        'Deal marked as sold',
+        result.message
+      );
       return { success: true, message: result.message };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'The deal could not be marked as sold.';
+      const message = error instanceof Error ? error.message : 'Save failed.';
       addToast('error', 'Mark Sold failed', message);
       return { success: false, message };
     }
   };
-
-  // Lead Intake Allocations (§5.3 & AC-4)
-  const createAllocation = async (data: Record<string, any>): Promise<AllocationItem | null> => {
-    try {
-      const res = await allocationApi.createAllocation(data);
-      if (res.success && res.data) {
-        setAllocations((prev) => [res.data!, ...prev]);
-        addToast('success', 'Lead Allocated', `New lead for ${data.name || 'prospect'} pushed to queue with 15m SLA.`);
-        return res.data;
+  const createAllocation = async (
+    data: Record<string, any>
+  ): Promise<AllocationItem | null> => {
+    let saved: AllocationItem | null = null;
+    await run(
+      'Lead allocation',
+      () => allocationApi.createAllocation(data),
+      async (row) => {
+        saved = row;
+        await refreshAll();
       }
-    } catch (err) {
-      console.warn('createAllocation error:', err);
-      addToast('error', 'Allocation Failed', 'Failed to create inbound lead allocation.');
-    }
-    return null;
-  };
-
-  const acceptAllocation = async (allocationId: string) => {
-    try {
-      await allocationApi.acceptAllocation(allocationId, currentUser.name);
-    } catch (err) {
-      console.warn('acceptAllocation api error:', err);
-    }
-
-    setAllocations((prev) =>
-      prev.map((a) => (a.allocation_id === allocationId ? { ...a, status: 'accepted' } : a))
     );
-
-    const alloc = allocations.find((a) => a.allocation_id === allocationId);
-    if (alloc) {
-      // Find or create customer
-      const existing = customers.find((c) => c.phone === alloc.phone);
-      if (existing) {
-        setCustomers((prev) =>
-          prev.map((c) =>
-            c.customer_id === existing.customer_id
-              ? { ...c, owner_name: currentUser.name, owner_user_id: currentUser.id }
-              : c
-          )
-        );
-      }
-
-      // Advance linked opportunity owner and advance stage from 'New / Allocated' to 'Working' (§5.4 exit criteria)
-      setOpportunities((prev) =>
-        prev.map((o) =>
-          o.customer_id === alloc.customer_id || (existing && o.customer_id === existing.customer_id)
-            ? {
-                ...o,
-                owner_name: currentUser.name,
-                owner_user_id: currentUser.id,
-                stage: o.stage === 'New / Allocated' ? 'Working' : o.stage,
-                updated_at: new Date().toISOString(),
-              }
-            : o
-        )
-      );
-
-      // Add Timeline event
-      const allocEvt: TimelineEvent = {
-        event_id: `EVT-${Date.now().toString().slice(-4)}`,
-        customer_id: alloc.customer_id,
-        occurred_at: 'Just now (AEST)',
-        source: 'Sales CRM',
-        type: 'assignment',
-        author: currentUser.name,
-        title: `Allocation Accepted by ${currentUser.name}`,
-        content: `Consultant accepted lead intake within SLA. Stage transitioned to Working and follow-up cadence initiated for ${alloc.vehicle}.`,
-        visibility: 'internal',
-      };
-      setTimelineEvents((prev) => [allocEvt, ...prev]);
-    }
-
-    addToast('success', 'Lead Allocation Accepted', 'You are now the active owner of this deal (Stage: Working).');
+    return saved;
   };
-
-  const reassignAllocation = async (allocationId: string, targetConsultant: string) => {
-    try {
-      await allocationApi.reassignAllocation(allocationId, targetConsultant);
-    } catch (err) {
-      console.warn('reassignAllocation api error:', err);
-    }
-
-    setAllocations((prev) =>
-      prev.map((a) =>
-        a.allocation_id === allocationId
-          ? { ...a, assigned_to: targetConsultant, status: 'reassigned' }
-          : a
-      )
+  const acceptAllocation = (id: string) =>
+    run(
+      'Allocation accepted',
+      () => allocationApi.acceptAllocation(id, currentUser.name),
+      refreshAll
     );
-    addToast('info', 'Lead Reassigned', `Prospect routed to ${targetConsultant}.`);
-  };
-
+  const reassignAllocation = (id: string, name: string) =>
+    run(
+      'Allocation reassigned',
+      () => allocationApi.reassignAllocation(id, name),
+      refreshAll
+    );
   const requestMoreLeads = () => {
-    addToast(
-      'info',
-      'Lead Request Submitted',
-      'BDC queue notified. Inbound qualified leads will be prioritized to your desk.'
-    );
+    void run('Lead request recorded', () => runtimeApi.requestLeads(site));
   };
-
-  // Click-to-call Phone Outreach Logging (§5.9)
   const logPhoneCall = (
-    customerId: string,
-    details: { outcome: string; durationMinutes: number; notes: string; opportunityId?: string }
+    id: string,
+    details: {
+      outcome: string;
+      durationMinutes: number;
+      notes: string;
+      opportunityId?: string;
+    }
+  ) =>
+    run(
+      'Call log saved',
+      () => runtimeApi.logCall(id, { ...details, author: currentUser.name }),
+      () => fetchCustomerTimeline(id)
+    );
+  const updateConsultantTarget = (
+    name: string,
+    target: number,
+    targetSite?: string
+  ) =>
+    run(
+      'Monthly target saved',
+      () =>
+        boardApi.updateTarget({
+          consultant: name,
+          targetUnits: target,
+          site: targetSite || actualSite(),
+        } as any),
+      fetchScoreboards
+    );
+  const holdStock = (stockId: string, opportunityId: string) =>
+    run(
+      'Stock reservation recorded',
+      () => vyApi.holdStock(stockId, opportunityId, currentUser.name),
+      refreshAll
+    );
+  const releaseStock = (stockId: string) =>
+    run(
+      'Stock reservation released',
+      () => vyApi.releaseStock(stockId),
+      refreshAll
+    );
+  const reconcileSalesLogRow = (id: string) =>
+    run(
+      'Reconciliation status saved',
+      () => syncApi.reconcileSalesLog(id),
+      () => fetchSalesLog({ site, limit: 50 })
+    );
+  const addDeliveryHandoverNote = (id: string, note: string) =>
+    run(
+      'Delivery note saved',
+      () => syncApi.updateDeliveryNote(id, note),
+      () => fetchDeliveryWatch({ site, limit: 20 })
+    );
+  const requestDeliveryDateChange = async (
+    id: string,
+    date: string,
+    reason: string
   ) => {
-    const callEvt: TimelineEvent = {
-      event_id: `EVT-${Date.now().toString().slice(-4)}`,
-      customer_id: customerId,
-      opportunity_id: details.opportunityId,
-      occurred_at: 'Just now (AEST)',
-      source: 'Sales CRM',
-      type: 'call_log',
-      author: currentUser.name,
-      title: `Phone Call Log · ${details.outcome} (${details.durationMinutes} min)`,
-      content: details.notes || `Phone call outcome: ${details.outcome}. Duration: ${details.durationMinutes} minutes.`,
-      visibility: 'internal',
-    };
-
-    setTimelineEvents((prev) => [callEvt, ...prev]);
-    addToast(
-      'success',
-      'Phone Call Logged',
-      `Recorded ${details.outcome} (${details.durationMinutes} min) on unified timeline.`
-    );
+    if (
+      !(await run(
+        'Date change request recorded',
+        () => syncApi.requestDeliveryDateChange(id, date, reason),
+        () => fetchDeliveryWatch({ site, limit: 20 })
+      ))
+    )
+      throw new Error('The date change request was not saved.');
   };
-
-  // Target Quota Maintenance (§5.5)
-  const updateConsultantTarget = async (consultantName: string, newTarget: number) => {
-    const score = CONSULTANT_SCORES.find((s) => s.name === consultantName);
-    if (score) {
-      score.target_units = newTarget;
-    }
-    try {
-      await boardApi.updateTarget({ targetUnitCount: newTarget });
-      await fetchScoreboards();
-      addToast('success', 'Monthly Quota Updated', `Updated target for ${consultantName} to ${newTarget} units.`);
-    } catch {
-      addToast('info', 'Monthly Quota Saved Locally', `Updated target for ${consultantName} to ${newTarget} units.`);
-    }
-  };
-
-  // Virtual Yard Stock Hold (§5.6 & AC-8)
-  const holdStock = async (stockId: string, opportunityId: string) => {
-    const opp = opportunities.find((o) => o.opportunity_id === opportunityId);
-
-    try {
-      await vyApi.holdStock(stockId, opportunityId, currentUser.name);
-    } catch (err) {
-      console.warn('holdStock api error:', err);
-    }
-
-    setVyStock((prev) =>
-      prev.map((s) => {
-        if (s.stock_id === stockId) {
-          return {
-            ...s,
-            status: 'Held',
-            held_by_consultant: currentUser.name,
-            held_for_customer: opp?.customer_name || 'Valued Buyer',
-            held_opportunity_id: opportunityId,
-            hold_expires_at: new Date(Date.now() + 48 * 3600000).toISOString(),
-          };
-        }
-        return s;
-      })
-    );
-
-    // Link stock to opportunity
-    if (opp) {
-      updateOpportunity(opportunityId, { vy_stock_id: stockId });
-      const holdEvt: TimelineEvent = {
-        event_id: `EVT-${Date.now().toString().slice(-4)}`,
-        customer_id: opp.customer_id,
-        opportunity_id: opp.opportunity_id,
-        occurred_at: 'Just now (AEST)',
-        source: 'Virtual Yard',
-        type: 'vy_stock_event',
-        author: currentUser.name,
-        title: `Virtual Yard Stock Hold Placed: ${stockId}`,
-        content: `Placed 48-hour reservation on stock unit ${stockId} for ${opp.customer_name}. Expiry in 48 hours.`,
-        visibility: 'internal',
-      };
-      setTimelineEvents((prev) => [holdEvt, ...prev]);
-    }
-
-    addToast('success', 'Stock Unit Held', `48-hour hold placed on ${stockId} in Virtual Yard.`);
-  };
-
-  const releaseStock = async (stockId: string) => {
-    try {
-      await vyApi.releaseStock(stockId);
-    } catch (err) {
-      console.warn('releaseStock api error:', err);
-    }
-
-    setVyStock((prev) =>
-      prev.map((s) =>
-        s.stock_id === stockId
-          ? {
-              ...s,
-              status: 'Available',
-              held_by_consultant: undefined,
-              held_for_customer: undefined,
-              held_opportunity_id: undefined,
-              hold_expires_at: undefined,
-            }
-          : s
-      )
-    );
-
-    const audit: AuditLogEntry = {
-      audit_id: `AUD-${Date.now().toString().slice(-4)}`,
-      actor: currentUser.name,
-      action: 'Stock Hold Released',
-      target_type: 'Stock',
-      target_id: stockId,
-      details: `Released stock unit ${stockId} back to available inventory.`,
-      source: 'Virtual Yard',
-      timestamp: new Date().toISOString(),
-    };
-    setAuditLog((prev) => [audit, ...prev]);
-
-    addToast('info', 'Stock Hold Released', `Stock unit ${stockId} returned to available inventory.`);
-  };
-
-  // Sales Log Reconcile (§5.7)
-  const reconcileSalesLogRow = async (salesLogId: string) => {
-    try {
-      await syncApi.reconcileSalesLog(salesLogId);
-    } catch (err) {
-      console.warn('reconcileSalesLogRow api error:', err);
-    }
-
-    setSalesLog((prev) =>
-      prev.map((sl) => (sl.sales_log_id === salesLogId ? { ...sl, reconciled: true } : sl))
-    );
-    addToast('success', 'Reconciled with Finance', `Row ${salesLogId} matched with official GL.`);
-  };
-
-  // Delivery Handover Watch Note Write-back (§5.8)
-  const addDeliveryHandoverNote = async (clientId: string, note: string) => {
-    try {
-      await syncApi.updateDeliveryNote(clientId, note);
-    } catch (err) {
-      console.warn('updateDeliveryNote api error:', err);
-    }
-
-    setDeliveryWatch((prev) =>
-      prev.map((d) => (d.client_id === clientId ? { ...d, last_comment: note } : d))
-    );
-
-    const client = deliveryWatch.find((d) => d.client_id === clientId);
-    if (client) {
-      const opp = opportunities.find((o) => o.opportunity_id === client.opportunity_id);
-      if (opp) {
-        addTimelineNote(opp.customer_id, `[Delivery Centre Handover Note]: ${note}`, opp.opportunity_id);
-      }
-    }
-
-    addToast('success', 'Handover Note Sent', 'Note transmitted to Delivery Centre specialist.');
-  };
-
-  // Request Delivery Date Change Action (§5.8)
-  const requestDeliveryDateChange = async (clientId: string, requestedDate: string, reason: string) => {
-    try {
-      await syncApi.requestDeliveryDateChange(clientId, requestedDate, reason);
-    } catch (err) {
-      console.warn('requestDeliveryDateChange api error:', err);
-    }
-
-    setDeliveryWatch((prev) =>
-      prev.map((d) =>
-        d.client_id === clientId
-          ? {
-              ...d,
-              last_comment: `[DATE CHANGE REQUEST]: Move to ${requestedDate} (${reason})`,
-              alert: 'Date Change Requested',
-            }
-          : d
-      )
-    );
-
-    const client = deliveryWatch.find((d) => d.client_id === clientId);
-    if (client) {
-      const opp = opportunities.find((o) => o.opportunity_id === client.opportunity_id);
-      if (opp) {
-        addTimelineNote(
-          opp.customer_id,
-          `[DELIVERY DATE CHANGE REQUEST]: Requested Date: ${requestedDate} | Reason: ${reason}`,
-          opp.opportunity_id
-        );
-      }
-    }
-
-    addToast(
-      'info',
-      'Date Change Transmitted',
-      `Requested reschedule to ${requestedDate} sent to Delivery Centre Coordinator.`
-    );
-  };
-
-  // Appointment creation with MongoDB integration
   const createAppointment = async (appt: Partial<Appointment>) => {
-    const siteVal = (appt.site || (selectedSite !== 'All Sites' ? selectedSite : 'Fairfield')) as SiteLocation;
-    const newApptData = {
-      bookingRequestId: appt.bookingRequestId,
-      virtualyard: appt.virtualyard,
-      customer_id: appt.customer_id || '',
-      customer_name: appt.customer_name || 'Customer',
-      prospectName: appt.customer_name || 'Customer',
-      phone: appt.phone || '',
-      type: appt.type || 'Test Drive',
-      when: appt.when || new Date().toISOString(),
-      durationMinutes: appt.duration_minutes || 45,
-      vehicle: appt.vehicle || 'BYD SEALION 7',
-      loop: appt.loop || 'CBD Demo Loop',
-      consultantName: appt.consultant || currentUser.name,
-      site: siteVal,
-      dealership: siteVal,
-      status: appt.status || 'Confirmed',
-      notes: appt.notes || '',
-    };
-
-    let createdAppt: Appointment = {
-      appointment_id: `APT-${Math.floor(500 + Math.random() * 499)}`,
-      customer_id: newApptData.customer_id,
-      customer_name: newApptData.customer_name,
-      phone: newApptData.phone,
-      type: newApptData.type as any,
-      when: newApptData.when,
-      duration_minutes: newApptData.durationMinutes,
-      vehicle: newApptData.vehicle,
-      loop: newApptData.loop,
-      consultant: currentUser.name,
-      site: siteVal,
-      status: 'Confirmed',
-      notes: newApptData.notes,
-    };
-
     try {
-      const res = await appointmentApi.createAppointment(newApptData);
-      if (!res.success || !res.data) throw new Error(res.message || 'The appointment could not be saved.');
-      if (res.success && res.data) {
-        const a = res.data;
-        createdAppt = {
-          appointment_id: a.appointment_id || a.appointmentId || a.id || `APT-${a._id}`,
-          customer_id: a.customer_id || newApptData.customer_id,
-          customer_name: a.customer_name || a.prospectName || newApptData.customer_name,
-          phone: a.phone || newApptData.phone,
-          type: a.type || newApptData.type,
-          when: a.when || newApptData.when,
-          duration_minutes: a.duration_minutes || a.durationMinutes || 45,
-          vehicle: a.vehicle || newApptData.vehicle,
-          loop: a.loop || newApptData.loop,
-          consultant: a.consultant || a.consultantName || currentUser.name,
-          site: (a.site || siteVal) as SiteLocation,
-          status: a.status || 'Confirmed',
-          notes: a.notes || newApptData.notes,
-          virtualyardSync: a.virtualyardSync,
-        };
-      }
-    } catch (err) {
-      addToast('error', 'Booking failed', err instanceof Error ? err.message : 'The appointment could not be saved.');
-      throw err;
+      if (!appt.when || !appt.vehicle)
+        throw new Error('A booking date, time and vehicle are required.');
+      const yard = actualSite(appt.site);
+      const data = must(
+        await appointmentApi.createAppointment({
+          ...appt,
+          bookingRequestId: appt.bookingRequestId,
+          virtualyard: appt.virtualyard,
+          prospectName: appt.customer_name,
+          consultantName: appt.consultant || currentUser.name,
+          durationMinutes: appt.duration_minutes,
+          site: yard,
+          dealership: yard,
+        })
+      );
+      const saved = mapAppointment(data);
+      setAppointments((old) => [
+        saved,
+        ...old.filter((row) => row.appointment_id !== saved.appointment_id),
+      ]);
+      if (saved.virtualyardSync?.state === 'synced')
+        addToast(
+          'success',
+          'Test drive saved',
+          `Virtual Yard booking #${saved.virtualyardSync.externalId}`
+        );
+      else if (saved.type === 'Test Drive')
+        addToast(
+          'warning',
+          'CRM booking saved; Virtual Yard needs attention',
+          saved.virtualyardSync?.message
+        );
+      else addToast('success', 'Appointment saved');
+      return saved;
+    } catch (error) {
+      addToast(
+        'error',
+        'Booking failed',
+        error instanceof Error ? error.message : 'Please try again.'
+      );
+      throw error;
     }
-
-    setAppointments((prev) => [createdAppt, ...prev]);
-
-    // Timeline event
-    const evt: TimelineEvent = {
-      event_id: `EVT-${Date.now().toString().slice(-4)}`,
-      customer_id: createdAppt.customer_id,
-      occurred_at: 'Just now (AEST)',
-      source: 'Sales CRM',
-      type: 'appointment',
-      author: currentUser.name,
-      title: `${createdAppt.type} Booked: ${createdAppt.vehicle}`,
-      content: `Scheduled for ${new Date(createdAppt.when).toLocaleString()}. Route: ${createdAppt.loop}. Notes: ${createdAppt.notes}`,
-      visibility: 'internal',
-    };
-    setTimelineEvents((prev) => [evt, ...prev]);
-
-    if (createdAppt.virtualyardSync?.state === 'synced') {
-      addToast('success', 'Test Drive Booked', `Saved in CRM and Virtual Yard (#${createdAppt.virtualyardSync.externalId}).`);
-    } else if (createdAppt.type === 'Test Drive') {
-      addToast('warning', 'Saved in CRM; Virtual Yard needs attention', createdAppt.virtualyardSync?.message || 'Check the appointment sync status before retrying.');
-    } else {
-      addToast('success', 'Appointment Scheduled', `${createdAppt.type} confirmed with ${createdAppt.customer_name}.`);
-    }
-    return createdAppt;
   };
-
-  // SMS Send (§5.9)
-  const sendSmsMessage = async (customerId: string, phone: string, message: string): Promise<boolean> => {
+  const sendSmsMessage = async (
+    id: string,
+    phone: string,
+    message: string
+  ): Promise<boolean> => {
     try {
-      await crmMessageApi.sendSms({ phone, body: message, customerId });
-    } catch (err) {
-      console.warn('sendSmsMessage api error:', err);
-      addToast('error', 'SMS failed', 'The message could not be sent.');
+      if (/\{\{.*?\}\}/.test(message))
+        throw new Error('Complete all template fields before sending.');
+      const sent = must(
+        await crmMessageApi.sendSms({ phone, body: message, customerId: id })
+      );
+      if (!sent.messageId)
+        throw new Error('The gateway did not confirm the message.');
+      await fetchCustomerTimeline(id);
+      addToast('success', 'SMS accepted by gateway');
+      return true;
+    } catch (error) {
+      addToast(
+        'error',
+        'SMS failed',
+        error instanceof Error ? error.message : 'Please try again.'
+      );
       return false;
     }
-
-    await fetchCustomerTimeline(customerId);
-
-    addToast('success', 'SMS Outbound Dispatched', `Message sent to ${phone} via MobileMessage gateway.`);
-    return true;
   };
-
-
-
-  // Filtered lists based on overall yard / department / site filter (selectedSite)
-  const filteredCustomers = customers.filter((c) =>
-    matchesSite(c.site || (c as any).location || (c as any).department, selectedSite)
-  );
-
-  const filteredOpportunities = opportunities.filter((o) =>
-    matchesSite(o.site || (o as any).location || (o as any).department, selectedSite)
-  );
-
-  const filteredAllocations = allocations.filter((a) =>
-    matchesSite(a.site || (a as any).yard || (a as any).dealer || (a as any).department, selectedSite)
-  );
-
-  const filteredSalesLog = salesLog.filter((s) =>
-    matchesSite(s.site || s.department || s.location || s.yard, selectedSite)
-  );
-
-  const filteredVyStock = vyStock.filter((v) =>
-    matchesSite(v.location || v.yard || v.site || v.department, selectedSite)
-  );
-
-  const filteredDeliveryWatch = deliveryWatch.filter((d) => {
-    if (
-      !selectedSite ||
-      selectedSite === 'All Sites' ||
-      selectedSite === 'All Locations' ||
-      selectedSite === 'All Sites & Yards' ||
-      selectedSite === 'All Yards' ||
-      selectedSite === 'All Departments' ||
-      selectedSite === 'All'
-    ) {
-      return true;
-    }
-    const opp = opportunities.find((o) => o.opportunity_id === d.opportunity_id);
-    const directSite = d.site || d.yard || d.dealer || d.department || d.location;
-    const oppSite = opp?.site;
-    if (!directSite && !oppSite) return true;
-    return matchesSite(directSite || oppSite, selectedSite);
-  });
-
-  const filteredAppointments = appointments.filter((a) =>
-    matchesSite(a.site || (a as any).loop || (a as any).location || (a as any).dealership, selectedSite)
-  );
-
   return (
     <CrmContext.Provider
       value={{
@@ -1426,25 +952,26 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         setSelectedSite,
         lockedSite,
         currentRole,
-        setCurrentRole: handleSetRole,
+        setCurrentRole,
         isOnline,
-        customers: filteredCustomers,
+        reference,
+        sites: reference.sites,
+        dataErrors,
+        fetchReferenceData,
+        refreshAll,
+        customers,
         customerOptions: customers,
-        opportunities: filteredOpportunities,
-        allocations: filteredAllocations,
+        opportunities,
+        allocations,
         timelineEvents,
-        vyStock: filteredVyStock,
-        salesLog: filteredSalesLog,
-        deliveryWatch: filteredDeliveryWatch,
-        appointments: filteredAppointments,
+        vyStock,
+        salesLog,
+        deliveryWatch,
+        appointments,
         auditLog,
-
-        // Scoreboards & Quotas
         boardMe,
         boardTeam,
         fetchScoreboards,
-
-        // Pagination states & fetchers
         vyStockPagination,
         customersPagination,
         opportunitiesPagination,
@@ -1459,7 +986,6 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         fetchSalesLog,
         fetchDeliveryWatch,
         fetchAppointments,
-
         addCustomer,
         updateCustomer,
         mergeCustomers,
@@ -1468,6 +994,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
         addTimelineNote,
         addTimelineEmail,
         fetchCustomerTimeline,
+        fetchCustomerAudit,
         addOpportunity,
         updateOpportunityStage,
         updateOpportunity,
@@ -1494,11 +1021,8 @@ export function CrmProvider({ children }: { children: ReactNode }) {
     </CrmContext.Provider>
   );
 }
-
 export function useCrm() {
   const context = useContext(CrmContext);
-  if (!context) {
-    throw new Error('useCrm must be used within a CrmProvider');
-  }
+  if (!context) throw new Error('useCrm must be used within a CrmProvider');
   return context;
 }

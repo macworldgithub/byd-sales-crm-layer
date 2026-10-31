@@ -31,8 +31,8 @@ interface HeaderProps {
 export function Header({ onSelectCustomer, onOpenQuickDeal, onToggleMobileMenu }: HeaderProps) {
   const {
     currentUser,
-    setCurrentRole,
     currentRole,
+    sites: availableSites,
     selectedSite,
     setSelectedSite,
     lockedSite,
@@ -110,27 +110,8 @@ export function Header({ onSelectCustomer, onOpenQuickDeal, onToggleMobileMenu }
   // Locked users can't clear/reset the site filter
   const isFilteredSite = !lockedSite && Boolean(selectedSite && selectedSite !== 'All Sites' && selectedSite !== 'All');
 
-  const allSites: { name: SiteLocation; label: string; desc: string }[] = [
-    { name: 'All Sites', label: 'All Sites & Yards', desc: 'All Dealerships, Yards & Departments' },
-    { name: 'BYD Melbourne City', label: 'BYD Melbourne City', desc: 'CBD Flagship Showroom & Delivery' },
-    { name: 'BYD Caroline Springs', label: 'BYD Caroline Springs', desc: 'Western Hub Dealership & Yard' },
-    { name: 'BYD Nunawading', label: 'BYD Nunawading', desc: 'Eastern Suburbs Showroom & Prep' },
-    { name: 'BYD Fairfield', label: 'BYD Fairfield', desc: 'Primary Showroom & Yard Operations' },
-    { name: 'Denza Melbourne', label: 'Denza Melbourne', desc: 'Luxury EV Experience & Handover' },
-    { name: 'Holding Yard VIC', label: 'Holding Yard VIC', desc: 'Central Vehicle Logistics & Altona Yard' },
-    { name: 'BYD Doncaster', label: 'BYD Doncaster', desc: 'Boutique Showroom & Test Drives' },
-  ];
-  const sites = lockedSite ? allSites.filter((s) => s.name === lockedSite)
-    : currentUser.allowed_sites && !currentUser.all_sites ? currentUser.allowed_sites.map(name => ({ name, label: name, desc: 'Assigned site' })) : allSites;
-
-
-  const roles: { role: UserRole; title: string; badge: string }[] = [
-    { role: 'consultant', title: 'Sales Consultant', badge: 'Fairfield' },
-    { role: 'manager', title: 'Sales Manager', badge: 'Floor Sup' },
-    { role: 'bdc', title: 'BDC / Controller', badge: 'Network' },
-    { role: 'delivery', title: 'Delivery Consultant', badge: 'Handover' },
-    { role: 'super_admin', title: 'Super Admin', badge: 'Harmony' },
-  ];
+  const allSites = [{ name: 'All Sites', label: 'All Sites & Yards', desc: 'All permitted locations' }, ...availableSites.map(name => ({ name, label: name, desc: '' }))];
+  const sites = lockedSite ? [{ name: lockedSite, label: lockedSite, desc: 'Assigned site' }] : Array.isArray(currentUser.allowed_sites) && !currentUser.all_sites ? currentUser.allowed_sites.map(name => ({ name, label: name, desc: 'Assigned site' })) : allSites;
 
   const renderSearchResults = () => {
     if (!isSearchOpen || q.length < 2) return null;
@@ -462,7 +443,7 @@ export function Header({ onSelectCustomer, onOpenQuickDeal, onToggleMobileMenu }
         {/* Network Connectivity Pill */}
         <div
           className={`connection-pill ${isOnline ? 'online' : 'offline'}`}
-          title={isOnline ? 'Connected to live event bus' : 'Offline floor mode active'}
+          title={isOnline ? 'Backend database connection verified' : 'Backend connection unavailable'}
         >
           <Radio className={`w-3.5 h-3.5 ${isOnline ? 'animate-pulse' : ''}`} />
           <span className="hidden sm:inline">{isOnline ? 'Live Mesh' : 'Yard Outbox'}</span>
@@ -581,6 +562,7 @@ function NotificationsBell({ site, onSelectCustomer }: { site: string; onSelectC
 
   useEffect(() => {
     let mounted = true;
+    setNotifications([]);
     import('@/lib/api').then(({ notificationApi }) => {
       notificationApi.getNotifications({ site: site !== 'All Sites' ? site : undefined }).then((res) => {
         if (mounted && res.success && res.data) {

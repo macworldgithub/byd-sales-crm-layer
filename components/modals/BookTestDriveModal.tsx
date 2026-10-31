@@ -27,7 +27,7 @@ export function BookTestDriveModal({ isOpen, onClose, preselectedCustomer }: Boo
   const [bookingType, setBookingType] = useState('T');
   const [status, setStatus] = useState('C');
   const [date, setDate] = useState('');
-  const [time, setTime] = useState('10:00');
+  const [time, setTime] = useState('');
   const [duration, setDuration] = useState('45');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');

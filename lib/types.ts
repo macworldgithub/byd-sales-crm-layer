@@ -111,7 +111,7 @@ export interface Opportunity {
   trade_in_details?: {
     makeModel: string;
     rego: string;
-    year: number;
+    year?: number | null;
     valuation: number;
     status: 'Pending' | 'Valued' | 'Accepted' | 'Settled';
   };

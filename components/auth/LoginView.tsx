@@ -11,8 +11,8 @@ interface LoginViewProps {
 
 export function LoginView({ onSuccess }: LoginViewProps) {
   const { setCurrentUser, setCurrentRole, setSelectedSite, addToast } = useCrm();
-  const [email, setEmail] = useState('alex.rivers@bydsouthport.com.au');
-  const [password, setPassword] = useState('BYD2026!Demo');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,7 +25,7 @@ export function LoginView({ onSuccess }: LoginViewProps) {
 
     try {
       const res = await authApi.login(creds);
-      if (res.success && res.data?.access_token) {
+      if (res.success && res.data?.access_token && (res.data.user?.id || res.data.user?._id)) {
         setToken(res.data.access_token);
         if (typeof window !== 'undefined') {
           localStorage.setItem('byd_crm_auth', 'true');
@@ -33,12 +33,12 @@ export function LoginView({ onSuccess }: LoginViewProps) {
         const u = res.data.user || {};
         const role = ({ sales_manager: 'manager', sales_consultant: 'consultant', agent: 'consultant', admin: 'site_admin', delivery_consultant: 'delivery' } as Record<string, string>)[u.role] || u.role;
         setCurrentUser({
-          id: u.id || u._id || 'usr-001',
+          id: u.id || u._id,
           name: u.name || 'Sales Consultant',
           email: u.email || creds.email,
           role: role || 'consultant',
-          site: u.site || 'Fairfield',
-          team: u.team || 'Sales Floor',
+          site: u.site || '',
+          team: u.team || '',
           avatarInitials: (u.name || 'SC')
             .split(' ')
             .map((n: string) => n[0])
@@ -60,65 +60,6 @@ export function LoginView({ onSuccess }: LoginViewProps) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const directLogins = [
-    {
-      name: 'BYD Nunawading',
-      role: 'agent',
-      email: 'nunawading@byd.com',
-      password: '123456',
-      label: 'Sales Desk & Handover',
-      site: 'BYD Nunawading',
-      badge: 'Nunawading Site',
-      highlight: true,
-    },
-    {
-      name: 'Alex Rivers',
-      role: 'sales_consultant',
-      email: 'alex.rivers@bydsouthport.com.au',
-      password: 'BYD2026!Demo',
-      label: 'Sales Consultant',
-      site: 'Fairfield',
-      badge: 'Fairfield',
-      highlight: false,
-    },
-    {
-      name: 'Sarah Chen',
-      role: 'sales_manager',
-      email: 'sarah.chen@bydsouthport.com.au',
-      password: 'BYD2026!Demo',
-      label: 'Floor Manager',
-      site: 'Fairfield',
-      badge: 'Fairfield',
-      highlight: false,
-    },
-    {
-      name: 'Marcus Vance',
-      role: 'bdc',
-      email: 'marcus.vance@bydsouthport.com.au',
-      password: 'BYD2026!Demo',
-      label: 'BDC Lead Controller',
-      site: 'Melbourne City',
-      badge: 'Melbourne City',
-      highlight: false,
-    },
-    {
-      name: 'System Admin',
-      role: 'admin',
-      email: 'admin@byd.com',
-      password: 'BYD@Admin2024',
-      label: 'Super Admin',
-      site: 'All Sites',
-      badge: 'All Sites',
-      highlight: false,
-    },
-  ];
-
-  const handleQuickSwitch = async (r: typeof directLogins[0]) => {
-    setEmail(r.email);
-    setPassword(r.password);
-    await handleLogin(undefined, { email: r.email, password: r.password });
   };
 
   return (
@@ -195,83 +136,11 @@ export function LoginView({ onSuccess }: LoginViewProps) {
             </button>
           </form>
 
-          {/* 1-Click Direct Sign In */}
-          <div className="pt-4 border-t border-slate-800 space-y-2.5">
-            <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider">
-              <span>1-Click Direct Sign In</span>
-              <span className="text-emerald-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live MongoDB Verified
-              </span>
-            </div>
-
-            {/* Nunawading Highlighted 1-Click Button */}
-            {directLogins.filter((d) => d.highlight).map((r) => (
-              <button
-                key={r.email}
-                type="button"
-                onClick={() => handleQuickSwitch(r)}
-                className="w-full p-3 rounded-xl bg-gradient-to-r from-red-950/70 via-slate-900 to-slate-950 border-2 border-[#e60012]/70 hover:border-[#e60012] text-left transition-all group cursor-pointer shadow-lg shadow-red-950/40 relative overflow-hidden"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#e60012] animate-ping inline-block" />
-                    <span className="text-xs font-bold text-white group-hover:text-red-400 transition-colors font-mono">
-                      {r.name}
-                    </span>
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-900/60 text-red-300 font-mono border border-red-700/50">
-                      1-Click Sign In
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-mono group-hover:text-white transition-colors">
-                    {r.email} →
-                  </span>
-                </div>
-                <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400 font-mono">
-                  <span>{r.label}</span>
-                  <span className="text-slate-500">Pass: 123456</span>
-                </div>
-              </button>
-            ))}
-
-            {/* Other Direct Dealership Logins */}
-            <div className="grid grid-cols-2 gap-2">
-              {directLogins.filter((d) => !d.highlight).map((r) => (
-                <button
-                  key={r.email}
-                  type="button"
-                  onClick={() => handleQuickSwitch(r)}
-                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-red-600/60 text-left transition-all group cursor-pointer"
-                >
-                  <div className="text-[11px] font-bold text-slate-200 group-hover:text-[#e60012] truncate">
-                    {r.name}
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-400 truncate">
-                    {r.label}
-                  </div>
-                  <div className="text-[9px] font-mono text-slate-500 truncate mt-0.5 flex items-center justify-between">
-                    <span>{r.site}</span>
-                    <span className="text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">Login →</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/60 text-[10px] font-mono text-slate-400 space-y-1">
-              <div className="text-slate-300 font-semibold flex items-center justify-between">
-                <span>Verified Credentials</span>
-                <span className="text-emerald-400 font-bold">1-Click Instant Login</span>
-              </div>
-              <div className="text-slate-400">
-                Nunawading: <strong className="text-slate-200">123456</strong> | Staff: <strong className="text-slate-200">BYD2026!Demo</strong> | Admin: <strong className="text-slate-200">BYD@Admin2024</strong>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Footer info */}
         <p className="text-[11px] font-mono text-slate-500 text-center">
-          Security: JWT Bearer Tokens · ACMA Spam Compliant · Privacy Act APP 12/13
+          Sign in with your assigned CRM account.
         </p>
       </div>
     </div>

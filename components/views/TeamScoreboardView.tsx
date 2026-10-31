@@ -19,10 +19,9 @@ import {
   Send,
 } from 'lucide-react';
 import { useCrm, matchesSite } from '@/lib/crmContext';
-import { CONSULTANT_SCORES } from '@/lib/data';
 
 export function TeamScoreboardView() {
-  const { selectedSite, addToast, boardTeam, updateConsultantTarget, opportunities, salesLog } = useCrm();
+  const { selectedSite, addToast, boardTeam, updateConsultantTarget, reference, sites, setSelectedSite, dataErrors, fetchScoreboards } = useCrm();
   const [siteFilter, setSiteFilter] = useState<string>(() => (selectedSite !== 'All Sites' ? selectedSite : 'All'));
 
   useEffect(() => {
@@ -35,70 +34,12 @@ export function TeamScoreboardView() {
 
   // Target Quota Modal State
   const [isQuotaModalOpen, setIsQuotaModalOpen] = useState(false);
-  const [targetConsultant, setTargetConsultant] = useState('Alex Rivers');
-  const [targetUnitsInput, setTargetUnitsInput] = useState(16);
+  const [targetConsultant, setTargetConsultant] = useState('');
+  const [targetUnitsInput, setTargetUnitsInput] = useState<number | ''>('');
+  const [targetYard, setTargetYard] = useState(selectedSite === 'All Sites' ? '' : selectedSite);
   const [isSavingTarget, setIsSavingTarget] = useState(false);
 
-  // Dynamically compute consultant scores from live opportunities & sales log
-  const baseScores = useMemo(() => {
-    if (boardTeam && Array.isArray(boardTeam.consultants) && boardTeam.consultants.length > 0) {
-      return boardTeam.consultants;
-    }
-
-    const consultantsList = [
-      { name: 'Alex Rivers', site: 'Fairfield', defaultTarget: 18 },
-      { name: 'Elena Rostova', site: 'Melbourne City', defaultTarget: 20 },
-      { name: 'Harrison Reed', site: 'Fairfield', defaultTarget: 16 },
-      { name: 'Marcus Vance', site: 'Caroline Springs', defaultTarget: 18 },
-      { name: 'Sarah Chen', site: 'Fairfield', defaultTarget: 15 },
-    ];
-
-    return consultantsList.map((c) => {
-      const consultantOpps = opportunities.filter((o) =>
-        o.owner_name?.toLowerCase().includes(c.name.toLowerCase())
-      );
-      const consultantSalesLogs = salesLog.filter((s) =>
-        s.consultant?.toLowerCase().includes(c.name.toLowerCase())
-      );
-
-      const writtenOpps = consultantOpps.filter(
-        (o) =>
-          o.stage === 'Written / Sold' ||
-          o.stage === 'In Delivery' ||
-          o.stage === 'Delivered / Won'
-      );
-      const openOpps = consultantOpps.filter(
-        (o) =>
-          o.stage !== 'Written / Sold' &&
-          o.stage !== 'In Delivery' &&
-          o.stage !== 'Delivered / Won' &&
-          o.stage !== 'Lost / Parked'
-      );
-
-      const writtenUnits = writtenOpps.length || consultantSalesLogs.length || 0;
-      const writtenGross =
-        consultantSalesLogs.reduce((acc, s) => acc + (s.gross || s.amount * 0.075 || 0), 0) ||
-        writtenOpps.reduce((acc, o) => acc + (o.total_deal_value || 0), 0) ||
-        0;
-
-      const fallbackScore = CONSULTANT_SCORES.find((cs) => cs.name === c.name);
-
-      return {
-        name: c.name,
-        site: c.site,
-        written_units_mtd: writtenUnits || fallbackScore?.written_units_mtd || 14,
-        target_units: fallbackScore?.target_units || c.defaultTarget,
-        written_gross_mtd: writtenGross || fallbackScore?.written_gross_mtd || 68400,
-        open_deals_count: openOpps.length || fallbackScore?.open_deals_count || 20,
-        overdue_actions_count: consultantOpps.filter((o) => o.is_overdue).length,
-        conversion_rate_pct:
-          consultantOpps.length > 0
-            ? Math.round((writtenUnits / consultantOpps.length) * 100)
-            : fallbackScore?.conversion_rate_pct || 38,
-        avg_first_touch_minutes: fallbackScore?.avg_first_touch_minutes || 8.5,
-      };
-    });
-  }, [boardTeam, opportunities, salesLog]);
+  const baseScores = Array.isArray(boardTeam?.consultants) ? boardTeam.consultants : [];
 
   const filteredConsultants = baseScores.filter((c: any) => {
     if (siteFilter !== 'All' && !matchesSite(c.site, siteFilter)) return false;
@@ -107,15 +48,15 @@ export function TeamScoreboardView() {
 
 
   const totalDepartmentUnits = filteredConsultants.reduce((s: number, c: any) => s + (c.written_units_mtd || 0), 0);
-  const totalDepartmentTarget = filteredConsultants.reduce((s: number, c: any) => s + (c.target_units || 16), 0);
-  const totalDepartmentGross = filteredConsultants.reduce((s: number, c: any) => s + (c.written_gross_mtd || 0), 0);
+  const totalDepartmentTarget = filteredConsultants.some((c: any) => c.target_units != null) ? filteredConsultants.reduce((s: number, c: any) => s + (c.target_units ?? 0), 0) : null;
+  const totalDepartmentGross = filteredConsultants.some((row: any) => row.written_gross_mtd == null) ? null : filteredConsultants.reduce((sum: number, row: any) => sum + row.written_gross_mtd, 0);
 
   const handleExportCsv = () => {
     const headers = 'Consultant,Site,WrittenUnitsMTD,TargetUnits,PacePct,WrittenGrossMTD,ConversionRatePct,AvgFirstTouchMin,OpenDeals\n';
     const rows = filteredConsultants
       .map(
         (c: any) =>
-          `"${c.name}","${c.site}",${c.written_units_mtd},${c.target_units},${Math.round((c.written_units_mtd / (c.target_units || 1)) * 100)},${c.written_gross_mtd},${c.conversion_rate_pct},${c.avg_first_touch_minutes},${c.open_deals_count}`
+          `"${c.name}","${c.site}",${c.written_units_mtd},${c.target_units ?? ''},${c.pace_pct ?? ''},${c.written_gross_mtd ?? ''},${c.conversion_rate_pct ?? ''},${c.avg_first_touch_minutes ?? ''},${c.open_deals_count}`
       )
       .join('\n');
 
@@ -135,12 +76,19 @@ export function TeamScoreboardView() {
     e.preventDefault();
     setIsSavingTarget(true);
     try {
-      await updateConsultantTarget(targetConsultant, Number(targetUnitsInput));
-      setIsQuotaModalOpen(false);
+      if (await updateConsultantTarget(targetConsultant, Number(targetUnitsInput), targetYard)) setIsQuotaModalOpen(false);
     } finally {
       setIsSavingTarget(false);
     }
   };
+
+  if (!Array.isArray(boardTeam?.consultants)) return (
+    <div className="surface-card p-6 space-y-3">
+      <h1 className="page-title">Department Performance</h1>
+      <p>{dataErrors['Team scoreboard'] || 'Loading saved performance records…'}</p>
+      {dataErrors['Team scoreboard'] && <button className="signal-button px-4 py-2" onClick={() => void fetchScoreboards()}>Retry</button>}
+    </div>
+  );
 
   return (
     <div className="view-stack">
@@ -160,17 +108,11 @@ export function TeamScoreboardView() {
         <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <select
             value={siteFilter}
-            onChange={(e) => setSiteFilter(e.target.value)}
+            onChange={(e) => { setSiteFilter(e.target.value); setSelectedSite(e.target.value === 'All' ? 'All Sites' : e.target.value); }}
             className="flex-1 sm:flex-initial text-xs p-2.5 rounded-xl border border-slate-200 bg-white font-medium outline-none shadow-sm min-w-[160px]"
           >
             <option value="All">All Sites & Yards</option>
-            <option value="BYD Melbourne City">BYD Melbourne City</option>
-            <option value="BYD Caroline Springs">BYD Caroline Springs</option>
-            <option value="BYD Nunawading">BYD Nunawading</option>
-            <option value="BYD Fairfield">BYD Fairfield</option>
-            <option value="Denza Melbourne">Denza Melbourne</option>
-            <option value="Holding Yard VIC">Holding Yard VIC</option>
-            <option value="BYD Doncaster">BYD Doncaster</option>
+            {sites.map(site => <option key={site} value={site}>{site}</option>)}
           </select>
 
           <button
@@ -199,22 +141,22 @@ export function TeamScoreboardView() {
           </span>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-bold text-slate-900 font-mono">{totalDepartmentUnits}</span>
-            <span className="text-slate-400 font-semibold">/ {totalDepartmentTarget} Target</span>
+            <span className="text-slate-400 font-semibold">/ {totalDepartmentTarget ?? 'Not set'} Target</span>
           </div>
           <span className="text-[11px] text-emerald-600 font-semibold block pt-1 font-mono">
-            {Math.round((totalDepartmentUnits / (totalDepartmentTarget || 1)) * 100)}% of Network Quota Run-Rate
+            {totalDepartmentTarget ? `${Math.round(totalDepartmentUnits / totalDepartmentTarget * 100)}% of saved targets` : 'No targets configured'}
           </span>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
-            Total Written Gross Profit (Est.)
+            Recorded Written Gross Profit
           </span>
           <div className="text-3xl font-bold text-slate-900 font-mono">
-            ${totalDepartmentGross.toLocaleString()}
+            {totalDepartmentGross == null ? '—' : `$${totalDepartmentGross.toLocaleString()}`}
           </div>
           <span className="text-[11px] text-slate-500 block pt-1">
-            Avg Profit: ${(totalDepartmentGross / (totalDepartmentUnits || 1)).toFixed(0)} / written contract
+            Avg Profit: {totalDepartmentGross == null || !totalDepartmentUnits ? '—' : `$${(totalDepartmentGross / totalDepartmentUnits).toFixed(0)}`} / written contract
           </span>
         </div>
 
@@ -222,7 +164,7 @@ export function TeamScoreboardView() {
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
             Funnel Conversion Rate
           </span>
-          <div className="text-3xl font-bold text-emerald-600 font-mono">38.4%</div>
+          <div className="text-3xl font-bold text-emerald-600 font-mono">{boardTeam?.averageConversionRate == null ? '—' : `${boardTeam.averageConversionRate}%`}</div>
           <span className="text-[11px] text-slate-500 block pt-1">
             Lead Centre Allocation › Test Drive › Contract
           </span>
@@ -258,7 +200,7 @@ export function TeamScoreboardView() {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {filteredConsultants.sort((a: any, b: any) => (b.written_units_mtd || 0) - (a.written_units_mtd || 0)).map((rep: any, idx: number) => {
-                const pacePct = Math.round(((rep.written_units_mtd || 0) / (rep.target_units || 16)) * 100);
+                const pacePct = rep.pace_pct ?? 0;
                 return (
                   <tr key={rep.name} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
@@ -276,7 +218,7 @@ export function TeamScoreboardView() {
                     <td className="py-3.5 px-4 text-slate-700">{rep.site}</td>
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
                       {rep.written_units_mtd || 0}{' '}
-                      <span className="text-slate-400 font-normal">/ {rep.target_units || 16}</span>
+                      <span className="text-slate-400 font-normal">/ {rep.target_units ?? 'Not set'}</span>
                     </td>
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
@@ -288,20 +230,20 @@ export function TeamScoreboardView() {
                             style={{ width: `${Math.min(pacePct, 100)}%` }}
                           />
                         </div>
-                        <span className="font-mono font-bold text-[11px]">{pacePct}%</span>
+                        <span className="font-mono font-bold text-[11px]">{rep.pace_pct == null ? 'Not set' : `${pacePct}%`}</span>
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                      ${(rep.written_gross_mtd || 0).toLocaleString()}
+                      {rep.written_gross_mtd == null ? '—' : `$${rep.written_gross_mtd.toLocaleString()}`}
                     </td>
                     <td className="py-3.5 px-4 font-mono text-emerald-600 font-bold">
-                      {rep.conversion_rate_pct || 25}%
+                      {rep.conversion_rate_pct == null ? '—' : `${rep.conversion_rate_pct}%`}
                     </td>
                     <td className="py-3.5 px-4 font-mono text-slate-600">
-                      {rep.avg_first_touch_minutes || 11} min
+                      {rep.avg_first_touch_minutes ?? '—'} min
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono text-slate-900 font-bold">
-                      {rep.open_deals_count || 4}
+                      {rep.open_deals_count ?? 0}
                     </td>
                   </tr>
                 );
@@ -329,6 +271,7 @@ export function TeamScoreboardView() {
             </div>
 
             <form onSubmit={handleSaveQuota} className="space-y-3.5">
+              <label className="block text-xs font-semibold">Yard<select required value={targetYard} className="w-full p-2.5 border rounded-lg mt-1" onChange={event => setTargetYard(event.target.value)}><option value="">Select yard</option>{sites.map(site => <option key={site} value={site}>{site}</option>)}</select></label>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Sales Consultant / Scope</label>
                 <select
@@ -336,11 +279,8 @@ export function TeamScoreboardView() {
                   onChange={(e) => setTargetConsultant(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none"
                 >
-                  <option value="Alex Rivers">Alex Rivers (Fairfield)</option>
-                  <option value="Sophie Tran">Sophie Tran (Melbourne City)</option>
-                  <option value="Jordan Vance">Jordan Vance (Doncaster)</option>
-                  <option value="Chloe Bennett">Chloe Bennett (Nunawading)</option>
-                  <option value="Site Target">Entire Department Target</option>
+                  <option value="">Select consultant</option>
+                  {baseScores.map((row: any) => <option key={`${row.name}:${row.site}`} value={row.name}>{row.name} ({row.site})</option>)}
                 </select>
               </div>
 
@@ -348,8 +288,8 @@ export function TeamScoreboardView() {
                 <label className="block text-xs font-bold text-slate-700 mb-1">Target Units (Monthly)</label>
                 <input
                   type="number"
-                  min={1}
-                  max={60}
+                  min={0}
+                  required
                   value={targetUnitsInput}
                   onChange={(e) => setTargetUnitsInput(Number(e.target.value))}
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold font-mono outline-none focus:border-slate-800"
@@ -366,7 +306,7 @@ export function TeamScoreboardView() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingTarget}
+                  disabled={isSavingTarget || !targetConsultant || !targetYard || targetUnitsInput === ''}
                   className="signal-button px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
                 >
                   {isSavingTarget ? (

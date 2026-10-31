@@ -26,15 +26,14 @@ export function MergeCustomerModal({
   const sourceCustomer = customers.find((c) => c.customer_id === sourceId);
   const targetCustomer = customers.find((c) => c.customer_id === targetId);
 
-  const handleMerge = (e: React.FormEvent) => {
+  const handleMerge = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sourceId || !targetId || sourceId === targetId) {
       alert('Please select two distinct customer records to merge.');
       return;
     }
 
-    mergeCustomers(sourceId, targetId);
-    onClose();
+    if (await mergeCustomers(sourceId, targetId)) onClose();
   };
 
   return (

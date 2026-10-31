@@ -16,9 +16,9 @@ import {
   ChevronRight,
   ShieldAlert,
 } from 'lucide-react';
+import { measured } from '@/lib/liveData';
 import { useCrm } from '@/lib/crmContext';
 import { Opportunity, Customer } from '@/lib/types';
-import { CONSULTANT_SCORES } from '@/lib/data';
 
 interface HomeViewProps {
   onNavigateTab: (tab: string) => void;
@@ -101,22 +101,13 @@ export function HomeView({
     );
   }, [userOpps]);
 
-  // Dynamic Metrics
-  const writtenUnitsCount = boardMe?.writtenUnitsMtd ?? writtenDeals.length;
-  const targetUnitsCount = boardMe?.targetUnits ?? (isManagerOrAdmin ? 18 * 4 : 18);
-  const quotaPacePct = Math.round((writtenUnitsCount / Math.max(1, targetUnitsCount)) * 100);
-
-  const writtenGrossAmount =
-    boardMe?.writtenGrossMtd ??
-    writtenDeals.reduce((sum, o) => sum + (o.total_deal_value || o.list_price || 60000), 0);
-
-  const avgGrossPerUnit =
-    writtenUnitsCount > 0 ? Math.round(writtenGrossAmount / writtenUnitsCount) : 0;
-
-  const totalHandledDeals = userOpps.length + userAllocations.length;
-  const liveConversionRate =
-    boardMe?.conversionRatePct ??
-    (totalHandledDeals > 0 ? Math.round((writtenUnitsCount / totalHandledDeals) * 100) : 38);
+  const writtenUnitsCount = boardMe?.writtenUnitsMtd;
+  const targetUnitsCount = boardMe?.targetUnits;
+  const quotaPacePct = boardMe?.pacePercentage;
+  const writtenGrossAmount = boardMe?.writtenGrossMtd;
+  const avgGrossPerUnit = writtenUnitsCount > 0 && writtenGrossAmount != null ? Math.round(writtenGrossAmount / writtenUnitsCount) : null;
+  const totalHandledDeals = boardMe?.openDealsCount;
+  const liveConversionRate = boardMe?.conversionRatePct;
 
   // Urgent SLA Allocations (< 15 mins)
   const urgentAllocations = userAllocations.filter(
@@ -149,7 +140,7 @@ export function HomeView({
             Operating Sales Desk · {selectedSite}
           </span>
           <h1 className="page-title mt-1">
-            Good morning, {currentUser.name.split(' ')[0]}
+            Welcome, {currentUser.name.split(' ')[0]}
           </h1>
           <p className="page-subtitle">
             Sitting between Lead Centre and Delivery Centre — your daily command post for lead intake, customer engagement, stock holds, and written deals.
@@ -193,11 +184,11 @@ export function HomeView({
             </div>
           </div>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="metric-value">{writtenUnitsCount}</span>
-            <span className="text-slate-400 font-semibold text-sm">/ {targetUnitsCount} Target</span>
+            <span className="metric-value">{measured(writtenUnitsCount)}</span>
+            <span className="text-slate-400 font-semibold text-sm">/ {targetUnitsCount || 'Not set'} Target</span>
           </div>
           <div className="metric-change text-emerald-600 font-medium">
-            {quotaPacePct}% of monthly quota ({writtenDeals.length} deals live)
+            {measured(quotaPacePct, '%')} of monthly quota ({writtenDeals.length} deals live)
           </div>
         </div>
 
@@ -210,10 +201,10 @@ export function HomeView({
             </div>
           </div>
           <div className="metric-value mt-1">
-            ${writtenGrossAmount.toLocaleString()}
+            {writtenGrossAmount == null ? '—' : `$${writtenGrossAmount.toLocaleString()}`}
           </div>
           <div className="metric-change text-slate-500 font-medium">
-            Avg Gross: ${avgGrossPerUnit.toLocaleString()} / unit
+            Avg Gross: {avgGrossPerUnit == null ? '—' : `$${avgGrossPerUnit.toLocaleString()}`} / unit
           </div>
         </div>
 
@@ -225,9 +216,9 @@ export function HomeView({
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className="metric-value mt-1">{liveConversionRate}%</div>
+          <div className="metric-value mt-1">{measured(liveConversionRate, '%')}</div>
           <div className="metric-change text-emerald-600 font-medium">
-            {writtenUnitsCount} won of {totalHandledDeals} pipeline items
+            {measured(writtenUnitsCount)} written this month · {totalHandledDeals ?? '—'} open deals
           </div>
         </div>
 
@@ -244,7 +235,7 @@ export function HomeView({
             <span className="text-slate-500 font-medium text-xs">Unworked Leads</span>
           </div>
           <div className="metric-change text-slate-500 font-medium">
-            Avg 1st touch: {boardMe?.avgFirstTouchMinutes ?? 8.8} min
+            Avg 1st touch: {boardMe?.avgFirstTouchMinutes ?? '—'} min
           </div>
         </div>
       </div>

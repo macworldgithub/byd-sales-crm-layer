@@ -32,12 +32,13 @@ export function StaffView() {
   const [selectedSite, setSelectedSite] = useState<string>('All Sites');
   const [selectedRole, setSelectedRole] = useState<string>('All Roles');
   const [availableSites, setAvailableSites] = useState<string[]>([]);
-  const [hasFullAccess, setHasFullAccess] = useState<boolean>(true);
+  const [hasFullAccess, setHasFullAccess] = useState<boolean>(false);
   const [userSite, setUserSite] = useState<string>('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchStaffData = async (siteOverride?: string) => {
     setLoading(true);
+    setStaff([]);
     setError(null);
     try {
       const activeSiteParam = siteOverride !== undefined ? siteOverride : selectedSite;

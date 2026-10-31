@@ -69,7 +69,7 @@ export async function readAllPages<T>(
 }
 
 export function useBrowse<T>(
-  resource: 'leads' | 'opportunities' | 'calendar',
+  resource: 'leads' | 'opportunities' | 'calendar' | 'audit',
   params: BrowseParams,
   allPages = false
 ) {

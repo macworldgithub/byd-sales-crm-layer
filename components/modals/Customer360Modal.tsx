@@ -37,7 +37,7 @@ import {
 import { Customer, Opportunity, TimelineEvent, DeliveryHandoverWatch, CustomerDocument } from '@/lib/types';
 import { useCrm } from '@/lib/crmContext';
 import { customerApi } from '@/lib/api';
-import { BYD_SMS_TEMPLATES } from '@/lib/data';
+import { fillSavedTemplate } from '@/lib/liveData';
 
 interface Customer360ModalProps {
   customer: Customer | null;
@@ -60,12 +60,15 @@ export function Customer360Modal({
     auditLog,
     addTimelineNote,
     fetchCustomerTimeline,
+    fetchCustomerAudit,
     toggleOptOut,
     unlinkCustomer,
     sendSmsMessage,
     logPhoneCall,
     requestDeliveryDateChange,
     addToast,
+    reference,
+    currentUser,
   } = useCrm();
 
   useEffect(() => {
@@ -92,14 +95,15 @@ export function Customer360Modal({
   >('timeline');
 
   // Input states
+  useEffect(() => { if (customer?.customer_id && activeTab === 'audit') void fetchCustomerAudit(customer.customer_id); }, [customer?.customer_id, activeTab]);
   const [newNote, setNewNote] = useState('');
   const [newSms, setNewSms] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
   // Phone Call Logger state (§5.9)
   const [isCallLoggerOpen, setIsCallLoggerOpen] = useState(false);
-  const [callOutcome, setCallOutcome] = useState('Connected');
-  const [callDuration, setCallDuration] = useState('5');
+  const [callOutcome, setCallOutcome] = useState('');
+  const [callDuration, setCallDuration] = useState('');
   const [callNotes, setCallNotes] = useState('');
 
   // Documents Vault state (§5.1)
@@ -124,35 +128,8 @@ export function Customer360Modal({
         if (res.success && res.data) {
           setDocuments(res.data);
         } else {
-          // Default pre-sale document templates
-          setDocuments([
-            {
-              doc_id: 'DOC-COS-01',
-              customer_id: customer.customer_id,
-              title: 'Contract of Sale & Trade Appraisal Form',
-              category: 'Contract & Forms',
-              file_name: `BYD_Sales_Contract_${customer.customer_id.slice(-6)}.pdf`,
-              file_size: '245 KB',
-              status: 'Verified',
-              notes: 'Signed contract and preliminary trade appraisal form.',
-              uploaded_by: 'Sales Consultant',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            },
-            {
-              doc_id: 'DOC-ID-02',
-              customer_id: customer.customer_id,
-              title: 'Driver Licence Copy (Front & Back)',
-              category: 'Identity Verification',
-              file_name: `Driver_Licence_${customer.name.replace(/\s+/g, '_')}.pdf`,
-              file_size: '1.2 MB',
-              status: 'Verified',
-              notes: 'Identity verified against state licensing database.',
-              uploaded_by: 'Sales Consultant',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            },
-          ]);
+          setDocuments([]);
+          addToast('error', 'Documents unavailable', res.message || 'Unable to load saved document records.');
         }
         setIsDocsLoading(false);
       }).catch(() => {
@@ -168,30 +145,19 @@ export function Customer360Modal({
     const payload = {
       title: newDocTitle.trim(),
       category: newDocCategory,
-      file_name: newDocFileName.trim() || `${newDocTitle.trim().replace(/\s+/g, '_')}.pdf`,
+      file_name: newDocFileName.trim(),
       notes: newDocNotes.trim(),
-      status: 'Verified' as const,
-      file_size: '350 KB',
+      status: 'Pending Review' as const,
     };
 
     try {
       const res = await customerApi.addDocument(customer.customer_id, payload);
-      if (res.success && res.data) {
-        setDocuments((prev) => [res.data as CustomerDocument, ...prev]);
-        addToast('success', 'Document Attached', `Saved ${payload.title} to customer vault.`);
-      }
-    } catch {
-      // Offline fallback
-      const localDoc: CustomerDocument = {
-        doc_id: `DOC-${Date.now().toString().slice(-6)}`,
-        customer_id: customer.customer_id,
-        ...payload,
-        uploaded_by: 'Sales Consultant',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setDocuments((prev) => [localDoc, ...prev]);
-      addToast('success', 'Document Attached', `Saved ${payload.title} to customer vault.`);
+      if (!res.success || !res.data) throw new Error(res.message || 'The document record was not saved.');
+      setDocuments(prev => [res.data!, ...prev]);
+      addToast('success', 'Document record saved');
+    } catch (error) {
+      addToast('error', 'Document record not saved', error instanceof Error ? error.message : 'Please try again.');
+      return;
     }
 
     setNewDocTitle('');
@@ -203,9 +169,11 @@ export function Customer360Modal({
   const handleDeleteDocument = async (docId: string) => {
     if (!customer?.customer_id || !confirm('Are you sure you want to remove this document from the vault?')) return;
     try {
-      await customerApi.deleteDocument(customer.customer_id, docId);
-    } catch {
-      // Ignore
+      const res = await customerApi.deleteDocument(customer.customer_id, docId);
+      if (!res.success) throw new Error(res.message || 'Delete failed.');
+    } catch (error) {
+      addToast('error', 'Document not removed', error instanceof Error ? error.message : 'Please try again.');
+      return;
     }
     setDocuments((prev) => prev.filter((d) => d.doc_id !== docId));
     addToast('info', 'Document Removed', 'Document deleted from customer record.');
@@ -237,10 +205,10 @@ export function Customer360Modal({
 
   const activeOpp = customerOpportunities[0];
 
-  const handleAddNoteSubmit = (e: React.FormEvent) => {
+  const handleAddNoteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNote.trim()) return;
-    addTimelineNote(customer.customer_id, newNote.trim(), activeOpp?.opportunity_id);
+    if (!await addTimelineNote(customer.customer_id, newNote.trim(), activeOpp?.opportunity_id)) return;
     setNewNote('');
   };
 
@@ -252,14 +220,15 @@ export function Customer360Modal({
     setNewSms('');
   };
 
-  const handleLogCallSubmit = (e: React.FormEvent) => {
+  const handleLogCallSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    logPhoneCall(customer.customer_id, {
+    const saved = await logPhoneCall(customer.customer_id, {
       outcome: callOutcome,
-      durationMinutes: parseInt(callDuration) || 5,
+      durationMinutes: Number(callDuration) || 0,
       notes: callNotes.trim(),
       opportunityId: activeOpp?.opportunity_id,
     });
+    if (saved === false) return;
     setCallNotes('');
     setIsCallLoggerOpen(false);
   };
@@ -356,7 +325,7 @@ export function Customer360Modal({
                 title="Toggle ACMA compliant do-not-contact flag"
               >
                 <ShieldAlert className="w-3.5 h-3.5" />
-                <span>{customer.do_not_contact ? 'DNC' : 'Consented'}</span>
+                <span>{customer.do_not_contact ? 'DNC' : customer.consent_sms ? 'Consented' : 'Consent not recorded'}</span>
               </button>
 
               {/* Unlink Mismatched Record (§5.10) */}
@@ -419,15 +388,7 @@ export function Customer360Modal({
               <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
                 Lead Centre Deep Link
               </span>
-              <a
-                href={`https://byd-leads-crm.vercel.app/leads/${customer.lead_prospect_id || '40192'}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs font-semibold text-sky-600 hover:underline flex items-center gap-1"
-              >
-                <span className="truncate">Lead #{customer.lead_prospect_id || 'LP-40192'}</span>
-                <ExternalLink className="w-3 h-3 shrink-0" />
-              </a>
+              {customer.lead_prospect_id ? (reference.links.leadCentre ? <a href={`${reference.links.leadCentre.replace(/\/$/, '')}/leads/${encodeURIComponent(customer.lead_prospect_id)}`} target="_blank" rel="noreferrer" className="text-xs text-sky-700 underline">Lead #{customer.lead_prospect_id}</a> : <span className="text-xs">Lead #{customer.lead_prospect_id}</span>) : <span className="text-xs text-slate-500">No linked lead</span>}
             </div>
 
             <div className="p-2 rounded-xl bg-white border border-slate-200">
@@ -436,7 +397,7 @@ export function Customer360Modal({
               </span>
               {customerDelivery ? (
                 <a
-                  href={`https://deliverycentre.com.au/clients/${customerDelivery.client_id}`}
+                  href={reference.links.deliveryCentre ? `${reference.links.deliveryCentre.replace(/\/$/, '')}/clients/${encodeURIComponent(customerDelivery.client_id)}` : undefined}
                   target="_blank"
                   rel="noreferrer"
                   className="text-xs font-semibold text-emerald-600 hover:underline flex items-center gap-1"
@@ -811,7 +772,7 @@ export function Customer360Modal({
                           </span>
                         </div>
                         <div className="text-[11px] text-slate-500 mt-0.5">
-                          {new Date(a.when).toLocaleString()} · Route: {a.loop || 'CBD Loop'} ({a.duration_minutes} min)
+                          {new Date(a.when).toLocaleString()} · Route: {a.loop || 'Not recorded'} ({a.duration_minutes ?? '—'} min)
                         </div>
                       </div>
                     </div>
@@ -832,7 +793,7 @@ export function Customer360Modal({
                     Two-Way SMS (MobileMessage Integration)
                   </span>
                   <p className="text-[11px] text-slate-500">
-                    Consent active since {new Date(customer.consent_updated_at).toLocaleDateString()} · ACMA compliant
+                    {customer.consent_sms ? 'SMS consent recorded' : 'SMS consent not recorded'}{customer.consent_updated_at ? ` · Updated ${new Date(customer.consent_updated_at).toLocaleDateString()}` : ''}
                   </p>
                 </div>
                 <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">Manual SMS · Staff sends each message</span>
@@ -842,34 +803,30 @@ export function Customer360Modal({
               <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm space-y-3">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-slate-800 uppercase tracking-wide font-mono">
-                    BYD Certified Template Packs
+                    Saved SMS templates
                   </span>
-                  <span className="text-[11px] text-slate-400">Insert compliant text</span>
+                  <span className="text-[11px] text-slate-400">Insert saved text</span>
                 </div>
                 <select
                   value={selectedTemplateId}
                   onChange={(e) => {
                     const tid = e.target.value;
                     setSelectedTemplateId(tid);
-                    const matched = BYD_SMS_TEMPLATES.find((t) => t.id === tid);
+                    const matched = reference.smsTemplates.find((t) => t.id === tid);
                     if (matched) {
-                      setNewSms(
-                        matched.body
-                          .replace('{{name}}', customer.name)
-                          .replace('{{vehicle}}', activeOpp?.vehicle_descriptor || 'BYD SEALION 7')
-                          .replace('{{time}}', '10:00 AM')
-                          .replace('{{colour}}', activeOpp?.colour || 'Atlantis Grey')
-                          .replace('{{vin}}', activeOpp?.vy_stock_id || 'VY-VIC-84920')
-                          .replace('{{vy_order_id}}', activeOpp?.vy_order_id || 'VYO-77419')
-                      );
+                      setNewSms(fillSavedTemplate(matched.body, {
+                        name: customer.name, first_name: customer.name.split(' ')[0], vehicle: activeOpp?.vehicle_descriptor,
+                        model: activeOpp?.model, colour: activeOpp?.colour, vin: customerDelivery?.vin,
+                        vy_order_id: activeOpp?.vy_order_id, consultant: currentUser.name, site: customer.site,
+                      }));
                     }
                   }}
                   className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
                 >
                   <option value="">-- Choose Template --</option>
-                  {BYD_SMS_TEMPLATES.map((tmpl) => (
+                  {reference.smsTemplates.map((tmpl) => (
                     <option key={tmpl.id} value={tmpl.id}>
-                      [{tmpl.category}] {tmpl.title}
+                      [{tmpl.category}] {tmpl.name}
                     </option>
                   ))}
                 </select>
@@ -1158,13 +1115,13 @@ export function Customer360Modal({
                   <div>
                     <span className="text-slate-500 block text-[11px]">Marketing & SMS Consent</span>
                     <strong className={customer.consent_sms ? 'text-emerald-700 font-semibold' : 'text-red-700 font-semibold'}>
-                      {customer.consent_sms ? 'Active Consent' : 'Opted-Out / Revoked'}
+                      {customer.do_not_contact ? 'Opted out' : customer.consent_sms ? 'Consent recorded' : 'Not recorded'}
                     </strong>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[11px]">Do Not Contact State</span>
                     <strong className={customer.do_not_contact ? 'text-red-700 font-semibold' : 'text-emerald-700 font-semibold'}>
-                      {customer.do_not_contact ? 'BLOCKED (DNC Active)' : 'Clear to Contact'}
+                      {customer.do_not_contact ? 'BLOCKED (DNC Active)' : 'No DNC flag recorded'}
                     </strong>
                   </div>
                   <div>
@@ -1317,6 +1274,7 @@ export function Customer360Modal({
                     onChange={(e) => setCallOutcome(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
                   >
+                    <option value="">Select outcome</option>
                     <option value="Connected">Connected & Spoke</option>
                     <option value="Left Voicemail">Left Voicemail</option>
                     <option value="Busy">Busy / No Answer</option>

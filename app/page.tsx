@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 
 export default function SalesCrmApp() {
-  const { toasts, removeToast, allocations, opportunities, customers, setCurrentUser, setCurrentRole, setSelectedSite } = useCrm();
+  const { toasts, removeToast, allocations, opportunities, customers, setCurrentUser, setCurrentRole, setSelectedSite, dataErrors, refreshAll } = useCrm();
 
   // Auth gate state (§8.1)
   const [mounted, setMounted] = useState<boolean>(false);
@@ -66,7 +66,7 @@ export default function SalesCrmApp() {
             const u = res.data;
             const role = ({ sales_manager: 'manager', sales_consultant: 'consultant', agent: 'consultant', admin: 'site_admin', delivery_consultant: 'delivery' } as Record<string, string>)[u.role] || u.role;
             setCurrentRole(role);
-            setCurrentUser({ id: u._id || u.id, email: u.email, name: u.name, role, site: u.site || 'All Sites', team: u.team || 'Sales Floor',
+            setCurrentUser({ id: u._id || u.id, email: u.email, name: u.name, role, site: u.site || 'All Sites', team: u.team || '',
               avatarInitials: u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase(), allowed_sites: u.allowed_sites, all_sites: u.all_sites });
             if (u.allowed_sites && !u.all_sites) setSelectedSite(u.site || u.allowed_sites[0]);
             setIsAuthenticated(true);
@@ -173,6 +173,7 @@ export default function SalesCrmApp() {
 
         {/* Scrollable Main Area */}
         <main className="app-main">
+          {!!Object.keys(dataErrors).length && <div role="alert" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><strong>Some live data could not be loaded.</strong> {Object.entries(dataErrors).map(([name, message]) => <p key={name}>{name}: {message}</p>)}<button onClick={() => void refreshAll()} className="mt-2 underline font-semibold">Retry live data</button></div>}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

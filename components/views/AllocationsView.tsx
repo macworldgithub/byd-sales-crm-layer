@@ -40,8 +40,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
     acceptAllocation,
     reassignAllocation,
     requestMoreLeads,
-    addToast,
-  } = useCrm();
+    addToast, reference, sites} = useCrm();
 
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -55,12 +54,12 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
 
   // Direct Intake Modal State
   const [showIntakeModal, setShowIntakeModal] = useState(false);
-  const defaultIntakeSite = getLockedSite() || (currentUser.site !== 'All Sites' ? currentUser.site : '') || 'BYD Nunawading';
+  const defaultIntakeSite = getLockedSite() || (currentUser.site !== 'All Sites' ? currentUser.site : '') || '';
   const [intakeSite, setIntakeSite] = useState<string>(defaultIntakeSite);
   const [intakeName, setIntakeName] = useState('');
   const [intakePhone, setIntakePhone] = useState('');
   const [intakeEmail, setIntakeEmail] = useState('');
-  const [intakeVehicle, setIntakeVehicle] = useState('BYD Seal');
+  const [intakeVehicle, setIntakeVehicle] = useState('');
   const [intakeConsultant, setIntakeConsultant] = useState('');
   const [isSubmittingIntake, setIsSubmittingIntake] = useState(false);
 
@@ -118,20 +117,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
     setCurrentPage(1);
   };
 
-  const SITES = [
-    'All Locations',
-    'BYD Nunawading',
-    'BYD Melbourne City',
-    'BYD Fairfield',
-    'BYD Caroline Springs',
-    'BYD Doncaster',
-    'Denza Melbourne',
-    'Holding Yard VIC',
-    'Nunawading',
-    'Fairfield',
-    'Melbourne City',
-    'Caroline Springs',
-  ];
+  const SITES = ['All Locations', ...sites];
 
   const handleReassignSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,7 +163,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
           </span>
           <h1 className="page-title mt-1">Allocation Inbox & SLA Queue</h1>
           <p className="page-subtitle">
-            Pre-qualified inbound prospects pushed from Lead Centre and BDC. 15-minute response SLA clock starts on allocation to stop lead decay.
+            Saved inbound allocations from Lead Centre and BDC. Response deadlines follow the current SLA configuration.
           </p>
         </div>
 
@@ -230,15 +216,15 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
           </div>
           <div>
             <span className="font-bold text-white flex items-center gap-1.5 flex-wrap">
-              Production Mode Active · Lead Centre Sandbox Quarantined (§5.10 & AC-11)
+              Lead intake records
             </span>
             <span className="text-[11px] text-slate-300 block sm:inline">
-              Demo-dataset records (~4,036 attachment prospects) are isolated from production CRM. Only live verified customer records are allocated to sales floor desks.
+              This inbox displays allocations saved in the CRM database.
             </span>
           </div>
         </div>
         <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30 shrink-0">
-          Zero Bleed Guard
+          Live database
         </span>
       </div>
 
@@ -340,6 +326,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
             className="w-full text-xs p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium outline-none cursor-pointer"
           >
             <option value="All">All Assigned Consultants</option>
+              {reference.consultants.map(name => <option key={name} value={name}>{name}</option>)}
             {consultants.map(c => <option key={c.email} value={c.name}>{c.name}</option>)}
           </select>
         </div>
@@ -394,7 +381,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                       {alloc.allocation_id}
                     </span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 text-[#e60012] font-mono">
-                      Qualification Score: {alloc.ai_score}/100
+                      Qualification score: {alloc.ai_score == null ? 'Not recorded' : `${alloc.ai_score}/100`}
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">
                       Source: {alloc.source}
@@ -630,7 +617,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                   </label>
                   <input
                     type="email"
-                    placeholder="david@example.com"
+                    placeholder="Email address"
                     value={intakeEmail}
                     onChange={(e) => setIntakeEmail(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
@@ -648,13 +635,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
                     onChange={(e) => setIntakeVehicle(e.target.value)}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
                   >
-                    <option value="BYD Seal">BYD Seal</option>
-                    <option value="BYD Atto 3">BYD Atto 3</option>
-                    <option value="BYD Sealion 6">BYD Sealion 6</option>
-                    <option value="BYD Sealion 7">BYD Sealion 7</option>
-                    <option value="BYD Shark 6">BYD Shark 6</option>
-                    <option value="BYD Dolphin">BYD Dolphin</option>
-                  </select>
+                  <option value="">Select vehicle</option>{reference.models.map(model => <option key={model.name} value={model.name}>{model.name}</option>)}</select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -677,7 +658,7 @@ export function AllocationsView({ onSelectCustomer }: AllocationsViewProps) {
 
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500">
                 <p>
-                  <strong>SLA Policy:</strong> Upon creation, a 15-minute response SLA timer begins immediately. If unaccepted, the floor manager will be alerted.
+                  <strong>SLA Policy:</strong> The saved SLA configuration determines the response deadline for new allocations.
                 </p>
               </div>
 
