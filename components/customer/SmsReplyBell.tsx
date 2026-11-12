@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, X } from 'lucide-react';
 import { smsReplyApi } from '@/lib/api';
 
@@ -88,11 +89,11 @@ export function SmsReplyBell({ scope = '', extra, extraCount = 0 }: { scope?: st
       <div className="mt-3 flex justify-between gap-3">{offset > 0 && <button onClick={() => setOffset(Math.max(0,offset-20))} className="text-xs font-semibold text-slate-700">Newer replies</button>}{data.has_more && <button onClick={() => setOffset(data.next_offset)} className="ml-auto text-xs font-semibold text-slate-700">Older replies</button>}</div>
       {extra}
     </section>}
-    {selected && <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-900/60 p-3 text-left" onMouseDown={event => { if (event.target === event.currentTarget) setSelected(null); }}><section role="dialog" aria-modal="true" aria-label="Customer SMS conversation" className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+    {selected && createPortal(<div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-900/60 p-3 text-left" onMouseDown={event => { if (event.target === event.currentTarget) setSelected(null); }}><section role="dialog" aria-modal="true" aria-label="Customer SMS conversation" className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
       <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 p-4"><div><h2 className="text-base font-semibold text-slate-900">{selected.sender_name || selected.phone}</h2><p className="mt-1 text-xs text-slate-500">{selected.phone} · {selected.site_name}</p></div><button aria-label="Close SMS conversation" onClick={() => setSelected(null)} className="rounded-lg p-2 text-slate-500"><X className="h-5 w-5"/></button></header>
       {threadError && <p role="alert" className="m-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{threadError}</p>}
       <div role="log" aria-label="Customer SMS messages" aria-live="polite" className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">{!thread && !threadError && <p className="text-sm text-slate-500">Loading conversation…</p>}{thread?.messages.map(message => <article key={`${message.direction}:${message.id}`} className={`max-w-[90%] rounded-xl border p-3 ${message.direction === 'inbound' ? 'border-sky-100 bg-white' : 'ml-auto border-slate-200 bg-slate-100'}`}><p className="whitespace-pre-wrap break-words text-sm text-slate-900">{message.body}</p><p className="mt-2 text-[11px] text-slate-500">{message.direction === 'inbound' ? 'Customer' : 'Team'} · {message.sent_at ? new Date(message.sent_at).toLocaleString('en-AU') : 'Time unavailable'}{message.direction === 'outbound' && message.status ? ` · ${message.status}` : ''}</p></article>)}</div>
       <form onSubmit={reply} className="shrink-0 space-y-2 border-t border-slate-200 p-4"><label htmlFor="notification-sms-reply" className="text-xs font-semibold text-slate-700">Reply by SMS</label><textarea id="notification-sms-reply" required maxLength={1600} rows={2} value={body} onChange={event => setBody(event.target.value)} disabled={!thread || sending} className="w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-900" placeholder="Write a reply…"/><button disabled={!thread || sending || !body.trim()} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{sending ? 'Sending…' : 'Send SMS'}</button></form>
-    </section></div>}
+    </section></div>, document.body)}
   </div>;
 }
