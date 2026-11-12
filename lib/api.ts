@@ -529,3 +529,24 @@ export const staffApi = {
 };
 
 
+
+
+// Persistent customer SMS reply notifications (shared with Delivery Centre).
+import type { SmsReplyPage, SmsReplyThread } from '@/components/customer/SmsReplyBell';
+async function smsResult<T>(request: Promise<{success: boolean; data?: T; message?: string}>): Promise<T> {
+  const result = await request;
+  if (!result.success || !result.data) throw new Error(result.message || 'SMS data unavailable.');
+  return result.data;
+}
+export const smsReplyApi = {
+  list: (site: string, all: boolean, offset: number) => smsResult(fetchApi<SmsReplyPage>(`/notifications/sms-replies?${new URLSearchParams({site, all:String(all),offset:String(offset)})}`)),
+  conversation: (id: string) => smsResult(fetchApi<SmsReplyThread>(`/notifications/sms-replies/${encodeURIComponent(id)}/messages`)),
+  read: async (id: string, seen_message_ids: string[]) => {
+    const result = await fetchApi(`/notifications/sms-replies/${encodeURIComponent(id)}/read`, {method:'POST',body:JSON.stringify({seen_message_ids})});
+    if (!result.success) throw new Error(result.message || 'Could not save read status.');
+  },
+  send: async (data: {phone: string; site: string; client_id?: string; body: string}) => {
+    const result = await fetchApi<{status?: string}>('/messages/send', {method:'POST',body:JSON.stringify(data)});
+    if (!result.success || ['failed','error'].includes(result.data?.status || '')) throw new Error(result.message || 'SMS was not sent.');
+  },
+};

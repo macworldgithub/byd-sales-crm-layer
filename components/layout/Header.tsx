@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Menu,
 } from 'lucide-react';
+import { SmsReplyBell } from '@/components/customer/SmsReplyBell';
 import { useCrm } from '@/lib/crmContext';
 import { SiteLocation, UserRole, Customer, Opportunity } from '@/lib/types';
 
@@ -555,95 +556,20 @@ export function Header({ onSelectCustomer, onOpenQuickDeal, onToggleMobileMenu }
   );
 }
 
-function NotificationsBell({ site, onSelectCustomer }: { site: string; onSelectCustomer: (c: Customer) => void }) {
+function NotificationsBell({ site }: { site: string; onSelectCustomer: (c: Customer) => void }) {
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const bellRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
-    let mounted = true;
-    setNotifications([]);
-    import('@/lib/api').then(({ notificationApi }) => {
-      notificationApi.getNotifications({ site: site !== 'All Sites' ? site : undefined }).then((res) => {
-        if (mounted && res.success && res.data) {
-          setNotifications(res.data);
-        }
-      });
-    });
-    return () => {
-      mounted = false;
+    let active = true, pending = false; setNotifications([]);
+    const refresh = async () => {
+      if (pending || document.visibilityState !== 'visible') return; pending = true;
+      try {
+        const { notificationApi } = await import('@/lib/api');
+        const response = await notificationApi.getNotifications({site: site !== 'All Sites' ? site : undefined});
+        if (active && response.success && response.data) setNotifications(response.data);
+      } catch {} finally { pending = false; }
     };
+    void refresh(); const timer = window.setInterval(refresh,30000);
+    return () => { active = false; window.clearInterval(timer); };
   }, [site]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const alertCount = notifications.length;
-
-  return (
-    <div ref={bellRef} className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-xl bg-slate-100/90 hover:bg-slate-200/70 border border-slate-200 text-slate-700 transition-all flex items-center justify-center"
-        title="Delivery & SLA Alerts"
-      >
-        <Bell className="w-4 h-4 text-slate-700" />
-        {alertCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#e60012] text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
-            {alertCount > 9 ? '9+' : alertCount}
-          </span>
-        )}
-      </button>
-
-      {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 p-3 animate-in fade-in space-y-2.5">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-            <span className="text-xs font-bold text-slate-900 font-mono uppercase tracking-wider">
-              Real-Time Floor Alerts
-            </span>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-800 font-mono">
-              {alertCount} Active
-            </span>
-          </div>
-
-          <div className="max-h-80 overflow-y-auto space-y-2 pr-1 text-xs">
-            {notifications.length === 0 ? (
-              <div className="p-4 text-center text-slate-400 text-xs">
-                No active delivery alerts or SLA breaches. All handovers clear!
-              </div>
-            ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`p-2.5 rounded-xl border transition-all ${
-                    n.severity === 'danger'
-                      ? 'bg-red-50/70 border-red-200 text-red-950'
-                      : n.severity === 'warning'
-                      ? 'bg-amber-50/70 border-amber-200 text-amber-950'
-                      : 'bg-blue-50/70 border-blue-200 text-blue-950'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-1">
-                    <strong className="font-bold text-[11px] block">{n.title}</strong>
-                    <span className="text-[9px] font-mono opacity-70">
-                      {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <p className="text-[11px] mt-0.5 leading-snug">{n.message}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  return <SmsReplyBell scope={site} extraCount={notifications.length} extra={!!notifications.length && <div className="mt-4 space-y-2 border-t border-slate-200 pt-4"><h3 className="text-xs font-semibold text-slate-600">Delivery & SLA alerts</h3>{notifications.map(n => <article key={n.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3"><strong className="text-xs text-slate-900">{n.title}</strong><p className="mt-1 text-xs text-slate-700">{n.message}</p></article>)}</div>}/>;
 }
-
