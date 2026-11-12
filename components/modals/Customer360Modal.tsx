@@ -38,6 +38,7 @@ import { Customer, Opportunity, TimelineEvent, DeliveryHandoverWatch, CustomerDo
 import { useCrm } from '@/lib/crmContext';
 import { customerApi } from '@/lib/api';
 import { fillSavedTemplate } from '@/lib/liveData';
+import { DeliveryProfile, DeliveryFinance } from '@/components/customer/DeliveryProfile';
 
 interface Customer360ModalProps {
   customer: Customer | null;
@@ -82,6 +83,8 @@ export function Customer360Modal({
   }, [customer?.customer_id]);
 
   const [activeTab, setActiveTab] = useState<
+    | 'overview'
+    | 'finance'
     | 'timeline'
     | 'deals'
     | 'vehicles'
@@ -92,13 +95,14 @@ export function Customer360Modal({
     | 'delivery'
     | 'privacy'
     | 'audit'
-  >('timeline');
+  >('overview');
 
   // Input states
   useEffect(() => { if (customer?.customer_id && activeTab === 'audit') void fetchCustomerAudit(customer.customer_id); }, [customer?.customer_id, activeTab]);
   const [newNote, setNewNote] = useState('');
   const [newSms, setNewSms] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  useEffect(() => { setActiveTab('overview'); setNewNote(''); setNewSms(''); }, [customer?.customer_id]);
 
   // Phone Call Logger state (§5.9)
   const [isCallLoggerOpen, setIsCallLoggerOpen] = useState(false);
@@ -234,21 +238,20 @@ export function Customer360Modal({
   };
 
   const tabs = [
-    { id: 'timeline', label: 'Timeline', count: customerTimeline.length },
-    { id: 'deals', label: 'Deals & Offers', count: customerOpportunities.length },
-    { id: 'vehicles', label: 'Vehicles & Trade-in' },
-    { id: 'appointments', label: 'Appointments', count: customerAppointments.length },
-    { id: 'messages', label: 'SMS & Comms' },
-    { id: 'notes', label: 'Internal Notes' },
+    { id: 'overview', label: 'Overview' },
+    { id: 'timeline', label: 'Activity / Notes', count: customerTimeline.length },
+    { id: 'vehicles', label: 'Vehicle & Spec' },
+    { id: 'finance', label: 'Finance / Payment' },
+    { id: 'delivery', label: 'Delivery', highlight: !!customerDelivery },
     { id: 'documents', label: 'Documents' },
-    { id: 'delivery', label: 'Delivery Handover', highlight: !!customerDelivery },
-    { id: 'privacy', label: 'Privacy & Retention' },
-    { id: 'audit', label: 'Audit Log' },
+    { id: 'audit', label: 'History' },
   ];
+  const section = ({ notes: 'timeline', appointments: 'timeline', messages: 'timeline', deals: 'vehicles', privacy: 'audit' } as Record<string, string>)[activeTab] || activeTab;
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden flex flex-col h-[96dvh] sm:h-[94vh] max-h-[96dvh]">
+      <div role="dialog" aria-modal="true" aria-label="Customer card" className="bg-white rounded-xl sm:rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden flex flex-col h-[96dvh] sm:h-[94vh] max-h-[96dvh]">
         {/* Hero Customer 360 Header (§5.1 & AC-1) */}
         <div className="p-3.5 sm:p-5 border-b border-slate-200 bg-slate-50 flex flex-col gap-3 sm:gap-4 shrink-0">
           <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
@@ -351,71 +354,12 @@ export function Customer360Modal({
             </div>
           </div>
 
-          {/* Quick Stats Bar & Upstream/Downstream Deep Links (§5.1, §5.2) */}
-          {/* Quick Stats Bar & Upstream/Downstream Deep Links (§5.1, §5.2) */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-slate-200 text-xs">
-            <div className="p-2 rounded-xl bg-white border border-slate-200">
-              <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
-                Open Deal Value
-              </span>
-              <strong className="text-sm font-bold text-slate-900 font-mono">
-                ${(customer.total_open_value || activeOpp?.total_deal_value || 0).toLocaleString()}
-              </strong>
-            </div>
-
-            <div className="p-2 rounded-xl bg-white border border-slate-200">
-              <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
-                Next Cadence Activity
-              </span>
-              <span className="text-xs font-semibold text-slate-800 truncate block">
-                {activeOpp?.next_action_text || 'Consultation follow-up'}
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono">
-                {activeOpp?.next_action_at ? new Date(activeOpp.next_action_at).toLocaleDateString('en-AU') : 'No Date'}
-              </span>
-            </div>
-
-            <div className="p-2 rounded-xl bg-white border border-slate-200">
-              <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
-                Active Vehicle & Stock
-              </span>
-              <span className="text-xs font-semibold text-slate-800 truncate block">
-                {activeOpp?.model || 'BYD Range'} · {activeOpp?.vy_stock_id || 'Factory Slot'}
-              </span>
-            </div>
-
-            <div className="p-2 rounded-xl bg-white border border-slate-200">
-              <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
-                Lead Centre Deep Link
-              </span>
-              {customer.lead_prospect_id ? (reference.links.leadCentre ? <a href={`${reference.links.leadCentre.replace(/\/$/, '')}/leads/${encodeURIComponent(customer.lead_prospect_id)}`} target="_blank" rel="noreferrer" className="text-xs text-sky-700 underline">Lead #{customer.lead_prospect_id}</a> : <span className="text-xs">Lead #{customer.lead_prospect_id}</span>) : <span className="text-xs text-slate-500">No linked lead</span>}
-            </div>
-
-            <div className="p-2 rounded-xl bg-white border border-slate-200">
-              <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
-                Delivery Centre Link
-              </span>
-              {customerDelivery ? (
-                <a
-                  href={reference.links.deliveryCentre ? `${reference.links.deliveryCentre.replace(/\/$/, '')}/clients/${encodeURIComponent(customerDelivery.client_id)}` : undefined}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs font-semibold text-emerald-600 hover:underline flex items-center gap-1"
-                >
-                  <span className="truncate">{customerDelivery.stage}</span>
-                  <ExternalLink className="w-3 h-3 shrink-0" />
-                </a>
-              ) : (
-                <span className="text-xs text-slate-400 italic">Pre-sale (Floor)</span>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* 9 Tab Navigation */}
         <div className="flex items-center gap-1 px-3 sm:px-4 border-b border-slate-200 bg-white overflow-x-auto touch-scroll shrink-0">
           {tabs.map((t) => {
-            const isActive = activeTab === t.id;
+            const isActive = section === t.id;
             return (
               <button
                 key={t.id}
@@ -446,6 +390,15 @@ export function Customer360Modal({
 
         {/* Tab Content Body */}
         <div className="p-3.5 sm:p-6 overflow-y-auto flex-1 bg-slate-50/50 touch-scroll">
+          <p className="mb-5 max-w-3xl text-sm text-slate-600">{({overview: 'Customer snapshot, enquiry vehicle and the next agreed action.', timeline: 'Recent calls, notes and customer interactions from your team.', deals: 'Open opportunities, pricing and deal progress.', vehicles: 'Enquiry vehicle, stock details and trade-in information.', finance: 'Agreed payment method and finance or leasing provider.', appointments: 'Scheduled showroom visits, test drives and follow-ups.', messages: 'Customer SMS messages and communication history.', notes: 'Internal notes and context for your sales team.', documents: 'Saved quotes, contracts, ID and supporting documents.', delivery: 'Promises, delivery window and payment details shared with Delivery, plus internal team chat.', privacy: 'Customer consent, access requests and retention controls.', audit: 'Complete record of changes and actions on this customer.'} as Record<string, string>)[activeTab]}</p>
+          {activeTab === 'overview' && <section className="max-w-3xl mx-auto space-y-5">
+            <div className="rounded-xl border border-slate-200 bg-white p-5"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Vehicle of interest</h3><p className="mt-2 text-lg font-semibold text-slate-900">{activeOpp?.vehicle_descriptor || activeOpp?.model || 'No enquiry vehicle recorded'}</p><p className="mt-1 text-sm text-slate-500">{activeOpp?.variant} {activeOpp?.colour}</p></div>
+            <dl className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2">{[['Current stage', activeOpp?.stage || customer.current_stage || 'Not recorded'], ['Consultant', activeOpp?.owner_name || customer.owner_name || 'Unassigned'], ['Dealership', customer.site || 'Not recorded'], ['Next action', activeOpp?.next_action_text || 'No next action recorded'], ['Contact', customer.phone || 'Not recorded'], ['Email', customer.email || 'Not recorded']].map(([label, value]) => <div key={label}><dt className="text-xs font-semibold text-slate-500">{label}</dt><dd className="mt-1 text-sm text-slate-900">{value}</dd></div>)}</dl>
+            {customer.notes && <div className="rounded-xl border border-slate-200 bg-white p-5"><h3 className="font-semibold text-slate-900">Customer summary</h3><p className="mt-2 line-clamp-3 text-sm text-slate-600">{customer.notes}</p><button onClick={() => setActiveTab('notes')} className="mt-3 text-sm font-semibold text-red-700">Read all notes</button></div>}
+            <div className="flex flex-wrap gap-3"><button onClick={() => onOpenBookDrive(customer)} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold">Book test drive</button>{activeOpp && !['Written / Sold','In Delivery','Delivered / Won','Lost / Parked'].includes(activeOpp.stage) && <button onClick={() => onOpenMarkSold(activeOpp)} className="rounded-lg bg-[#e60012] px-4 py-2 text-sm font-semibold text-white">Sold · send to Delivery</button>}<button onClick={() => setActiveTab('delivery')} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold">View Delivery</button></div>
+          </section>}
+          {activeTab === 'finance' && <div className="max-w-3xl mx-auto rounded-xl border border-slate-200 bg-white p-5"><h3 className="font-semibold">Payment & finance</h3><p className="mt-2 text-sm text-slate-600">{activeOpp?.sale_type || 'Sale type not recorded'}</p><p className="mt-2 text-sm text-slate-600">Payment method and provider are recorded in the Sold handoff.</p><DeliveryFinance referenceId={customer.customer_id}/></div>}
+          {['timeline','vehicles','audit'].includes(section) && <div className="mb-5 flex flex-wrap gap-2">{(section === 'timeline' ? [['timeline','Activity'],['notes','Internal notes'],['messages','Customer SMS'],['appointments','Appointments']] : section === 'vehicles' ? [['vehicles','Vehicle & trade-in'],['deals','Deals & offers']] : [['audit','Record history'],['privacy','Privacy & consent']]).map(([id,label]) => <button key={id} onClick={() => setActiveTab(id as typeof activeTab)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${activeTab === id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{label}</button>)}</div>}
           {/* 1. TIMELINE TAB (§5.2 & AC-2, AC-3) */}
           {activeTab === 'timeline' && (
             <div className="space-y-6 max-w-3xl mx-auto">
@@ -974,6 +927,7 @@ export function Customer360Modal({
           )}
 
           {/* 8. DELIVERY HANDOVER TAB (§5.8 & AC-9) */}
+          {activeTab === 'delivery' && <div className="mb-6"><DeliveryProfile referenceId={customer.customer_id} opportunityId={activeOpp?.opportunity_id} vehicle={activeOpp?.vehicle_descriptor}/></div>}
           {activeTab === 'delivery' && (
             <div className="space-y-5 max-w-3xl mx-auto">
               {customerDelivery ? (

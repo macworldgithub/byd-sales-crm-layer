@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { DeliveryNotifications } from '@/components/customer/DeliveryProfile';
 import { Header } from '@/components/layout/Header';
 import { HomeView } from '@/components/views/HomeView';
 import { PipelineView } from '@/components/views/PipelineView';
@@ -170,6 +171,8 @@ export default function SalesCrmApp() {
           onOpenQuickDeal={() => setIsAddDealOpen(true)}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
+
+        <DeliveryNotifications/>
 
         {/* Scrollable Main Area */}
         <main className="app-main">

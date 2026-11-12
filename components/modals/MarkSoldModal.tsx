@@ -33,6 +33,10 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
   const [splitPercent, setSplitPercent] = useState('100');
   const [deposit, setDeposit] = useState('');
   const [financeMethod, setFinanceMethod] = useState('Finance');
+  const [promises, setPromises] = useState('');
+  const [leadTime, setLeadTime] = useState('');
+  const [provider, setProvider] = useState('');
+  const [deliveryNotes, setDeliveryNotes] = useState('');
   const [isFactoryOrder, setIsFactoryOrder] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -40,7 +44,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
   // Initialize defaults when modal opens or opportunity changes
   React.useEffect(() => {
     if (opportunity) {
-      setError('');
+      setError(''); setPromises(''); setLeadTime(''); setProvider(''); setDeliveryNotes(''); setFinanceMethod('Finance');
       setSaleType(opportunity.sale_type || 'Retail');
       setPrimarySalesperson(opportunity.owner_name || currentUser.name);
       setIsFactoryOrder(opportunity.order_type === 'Factory Order');
@@ -62,7 +66,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
         }
       }
     }
-  }, [opportunity, currentUser, vyStock]);
+  }, [opportunity?.opportunity_id, isOpen]);
 
   if (!isOpen || !opportunity) return null;
 
@@ -83,6 +87,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
         secondary_salesperson: secondarySalesperson || undefined,
         deposit: parseFloat(deposit) || 0,
         finance_method: financeMethod,
+        delivery_handoff: { promises, lead_time: leadTime, payment_method: financeMethod, finance_provider: provider, delivery_notes: deliveryNotes },
         is_factory_order: isFactoryOrder,
       });
       if (result.success) onClose();
@@ -115,10 +120,10 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
             </div>
             <div>
               <span className="text-[10px] font-bold text-[#e60012] tracking-wider uppercase font-mono">
-                Controlled Orchestration · §7.5
+                Sales to Delivery
               </span>
               <h3 className="text-base sm:text-lg font-bold text-slate-900">
-                Mark Deal Written & Sold
+                Sold · Delivery handoff
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-1">
                 {opportunity.vehicle_descriptor} · {opportunity.customer_name} (${opportunity.total_deal_value.toLocaleString()})
@@ -131,36 +136,6 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
           >
             <X className="w-5 h-5" />
           </button>
-        </div>
-
-        {/* 3-Way Synchronization Diagram Banner */}
-        <div className="p-3 sm:p-4 bg-slate-900 text-white border-b border-slate-800">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono mb-2">
-            Atomic Multi-System Write Architecture
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs">
-            <div className="p-2 sm:p-2.5 rounded-xl bg-white/10 border border-white/10 flex sm:flex-col items-center gap-2 sm:gap-1 text-left sm:text-center">
-              <Car className="w-4 h-4 text-sky-400 shrink-0" />
-              <div>
-                <strong className="text-[11px] block">1. Virtual Yard</strong>
-                <span className="text-[9px] text-slate-300 block">Reserve & confirm order</span>
-              </div>
-            </div>
-            <div className="p-2 sm:p-2.5 rounded-xl bg-white/10 border border-white/10 flex sm:flex-col items-center gap-2 sm:gap-1 text-left sm:text-center">
-              <FileCheck2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <div>
-                <strong className="text-[11px] block">2. Sales Log</strong>
-                <span className="text-[9px] text-slate-300 block">Live written deal upsert</span>
-              </div>
-            </div>
-            <div className="p-2 sm:p-2.5 rounded-xl bg-white/10 border border-white/10 flex sm:flex-col items-center gap-2 sm:gap-1 text-left sm:text-center">
-              <Truck className="w-4 h-4 text-amber-400 shrink-0" />
-              <div>
-                <strong className="text-[11px] block">3. Delivery Centre</strong>
-                <span className="text-[9px] text-slate-300 block">Create handover client</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Form Body */}
@@ -253,14 +228,20 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
                 onChange={(e) => setFinanceMethod(e.target.value)}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
               >
-                <option value="Cash / EFT">Direct Bank Transfer (EFT)</option>
+                <option value="Cash">Direct Bank Transfer (EFT)</option>
                 <option value="Finance">Dealer Finance (St. George / Macquarie)</option>
-                <option value="Novated Lease">Novated Lease (Salary Packaging)</option>
-                <option value="Fleet Credit">Commercial Fleet Facility</option>
+                <option value="Novated lease">Novated Lease (Salary Packaging)</option>
+                <option value="Lease">Lease</option><option value="Other">Other</option>
               </select>
             </div>
           </div>
 
+          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4"><legend className="px-1 text-sm font-semibold">Delivery handoff</legend><p className="text-xs text-slate-600">Share the customer's agreed promises and delivery expectations with the Delivery team.</p>
+            <label className="block text-sm">Promises made<textarea required maxLength={2000} rows={2} value={promises} onChange={e => setPromises(e.target.value)} placeholder="List agreed promises, or enter None." className="mt-1 w-full rounded-lg border p-2"/></label>
+            <label className="block text-sm">Expected lead time / delivery window<input required maxLength={2000} value={leadTime} onChange={e => setLeadTime(e.target.value)} className="mt-1 w-full rounded-lg border p-2"/></label>
+            <label className="block text-sm">Finance / leasing provider<input required={['Finance','Lease','Novated lease'].includes(financeMethod)} maxLength={2000} value={provider} onChange={e => setProvider(e.target.value)} className="mt-1 w-full rounded-lg border p-2"/></label>
+            <label className="block text-sm">Notes for Delivery<textarea maxLength={2000} rows={3} value={deliveryNotes} onChange={e => setDeliveryNotes(e.target.value)} className="mt-1 w-full rounded-lg border p-2"/></label>
+          </fieldset>
           {/* Deposit & Commission Attribution (§5.5) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
