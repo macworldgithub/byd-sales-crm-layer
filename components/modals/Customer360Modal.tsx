@@ -1162,6 +1162,7 @@ export function Customer360Modal({
           )}
 
           {/* 10. AUDIT LOG TAB (§5.10 & AC-10) */}
+          {activeTab === 'audit' && <div className="mb-6"><DeliveryProfile referenceId={customer.customer_id} allowSold={false} historyOnly/></div>}
           {activeTab === 'audit' && (
             <div className="space-y-3 max-w-3xl mx-auto">
               <span className="text-xs font-bold text-slate-900 block mb-2 font-mono uppercase tracking-wider">
