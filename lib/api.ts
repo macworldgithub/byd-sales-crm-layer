@@ -264,6 +264,7 @@ export const opportunityApi = {
       finance_method?: string;
       delivery_handoff?: { promises: string; lead_time: string; payment_method: string; finance_provider: string; delivery_notes: string };
       is_factory_order?: boolean;
+      vin_tba?: boolean;
     }
   ) =>
     fetchApi<{
@@ -376,11 +377,21 @@ export const syncApi = {
 
 // ─── Messaging & SMS API ───────────────────────────────────────────────────
 export const crmMessageApi = {
-  sendSms: (payload: { phone: string; body: string; customerId?: string; templateId?: string }) =>
+  sendSms: (payload: { phone: string; body: string; customerId?: string; client_id?: string; site?: string; templateId?: string }) =>
     fetchApi<{ messageId: string; status: string }>('/messages/send', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+};
+
+export interface PostDeliveryFollowup {
+  id: string; client_id: string; customer_id?: string; customer_name: string; phone: string; vehicle: string;
+  site: string; salesperson_name: string; body: string; due_at: string; status: string;
+}
+export const postDeliveryApi = {
+  list: (site?: string) => fetchApi<PostDeliveryFollowup[]>(`/crm/post-delivery-followups${buildQueryString({ site })}`),
+  complete: (id: string, input: { notes: string; call_outcome: string; text_action: string }) =>
+    fetchApi<PostDeliveryFollowup>(`/crm/post-delivery-followups/${encodeURIComponent(id)}/complete`, { method: 'POST', body: JSON.stringify(input) }),
 };
 
 // ─── Real-Time Notifications API ───────────────────────────────────────────

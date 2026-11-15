@@ -174,6 +174,7 @@ interface CrmContextType {
       finance_method?: string;
       delivery_handoff?: { promises: string; lead_time: string; payment_method: string; finance_provider: string; delivery_notes: string };
       is_factory_order?: boolean;
+      vin_tba?: boolean;
     }
   ) => Promise<{ success: boolean; message: string }>;
 

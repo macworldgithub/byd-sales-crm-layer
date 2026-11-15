@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { DeliveryNotifications } from '@/components/customer/DeliveryProfile';
+import { PostDeliveryFollowups } from '@/components/customer/PostDeliveryFollowups';
 import { Header } from '@/components/layout/Header';
 import { HomeView } from '@/components/views/HomeView';
 import { PipelineView } from '@/components/views/PipelineView';
@@ -31,7 +32,7 @@ import { ToastContainer } from '@/components/ui/Toast';
 import { useCrm } from '@/lib/crmContext';
 import { Customer, Opportunity } from '@/lib/types';
 import { LoginView } from '@/components/auth/LoginView';
-import { getToken } from '@/lib/api';
+import { getToken, customerApi } from '@/lib/api';
 import {
   LayoutDashboard,
   GitBranch,
@@ -173,6 +174,7 @@ export default function SalesCrmApp() {
         />
 
         <DeliveryNotifications/>
+        <PostDeliveryFollowups onOpenCustomer={async id => { const result = await customerApi.getCustomer(id); if (result.success && result.data) setSelected360Customer(result.data); }}/>
 
         {/* Scrollable Main Area */}
         <main className="app-main">

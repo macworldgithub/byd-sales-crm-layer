@@ -2,15 +2,18 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchApi } from '@/lib/api';
+import { InventoryVinPicker } from './InventoryVinPicker';
+import { useCrm } from '@/lib/crmContext';
 
 type Handoff = { promises: string; lead_time: string; payment_method: string; finance_provider: string; delivery_notes: string; submitted_by?: string; submitted_at?: string };
 type Message = { id: string; body: string; author_name: string; team: string; created_at: string };
-type Profile = { customer_id: string; client_id: string | null; handoff: Handoff | null; stage: string | null; messages: Message[]; last_delivery_message_id?: string; unread: number; has_more: boolean };
+type Profile = { customer_id: string; client_id: string | null; site?: string; handoff: Handoff | null; stage: string | null; messages: Message[]; last_delivery_message_id?: string; unread: number; has_more: boolean };
 const initial: Omit<Handoff, 'submitted_by' | 'submitted_at'> = { promises: '', lead_time: '', payment_method: 'Cash', finance_provider: '', delivery_notes: '' };
 const labels: Record<keyof typeof initial, string> = { promises: 'Promises made', lead_time: 'Expected lead time / delivery window', payment_method: 'Payment method', finance_provider: 'Finance / leasing provider', delivery_notes: 'Notes for Delivery' };
 const inputClass = 'w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm text-slate-900';
 
 export function DeliveryProfile({ referenceId, opportunityId, vehicle, allowSold = true, onSold, historyOnly = false }: { referenceId: string; opportunityId?: string; vehicle?: string; allowSold?: boolean; onSold?: () => void; historyOnly?: boolean }) {
+  const { selectedSite } = useCrm();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState('');
   const [olderMessages, setOlderMessages] = useState<Message[]>([]);
@@ -21,7 +24,8 @@ export function DeliveryProfile({ referenceId, opportunityId, vehicle, allowSold
   const [selling, setSelling] = useState(false);
   const [handoff, setHandoff] = useState<Handoff>(initial);
   const [vin, setVin] = useState('');
-  const [factory, setFactory] = useState(false);
+  const [vinTba, setVinTba] = useState(false);
+  const [selectedStockId, setSelectedStockId] = useState('');
   const [saleType, setSaleType] = useState('Retail');
   const path = `/customer-delivery/profiles/${encodeURIComponent(referenceId)}`;
   const activePath = useRef(path);
@@ -32,7 +36,7 @@ export function DeliveryProfile({ referenceId, opportunityId, vehicle, allowSold
   }, [path]);
   useEffect(() => {
     let active = true, pending = false; activePath.current = path;
-    setProfile(null); setError(''); setSelling(false); setHandoff(initial); setVin(''); setMessage(''); setFactory(false); setOlderMessages([]); setOlderHasMore(null); setLoadingOlder(false);
+    setProfile(null); setError(''); setSelling(false); setHandoff(initial); setVin(''); setMessage(''); setVinTba(false); setSelectedStockId(''); setOlderMessages([]); setOlderHasMore(null); setLoadingOlder(false);
     const refresh = async () => {
       if (pending || document.visibilityState !== 'visible') return;
       pending = true;
@@ -75,9 +79,10 @@ export function DeliveryProfile({ referenceId, opportunityId, vehicle, allowSold
   }
   async function sold(event: React.FormEvent) {
     event.preventDefault(); if (busy) return;
+    if (!vinTba && (!selectedStockId || !vin.trim())) { setError('Select an inventory vehicle or choose TBA.'); return; }
     setBusy(true); setError('');
     try {
-      const response = await fetchApi<{ deliverySyncSuccess: boolean }>(`${path}/sold`, { method: 'POST', body: JSON.stringify({ opportunity_id: opportunityId, vehicle_descriptor: vehicle, vin, is_factory_order: factory, sale_type: saleType, delivery_handoff: handoff }) });
+      const response = await fetchApi<{ deliverySyncSuccess: boolean }>(`${path}/sold`, { method: 'POST', body: JSON.stringify({ opportunity_id: opportunityId, vehicle_descriptor: vehicle, vin, vy_stock_id: vinTba ? undefined : selectedStockId, vin_tba: vinTba, sale_type: saleType, delivery_handoff: handoff }) });
       if (!response.success) throw new Error(response.message || 'The deal was not saved.');
       setProfile(await reload());
       if (response.data?.deliverySyncSuccess === false) throw new Error('The sale is recorded, but Delivery sync is pending. Contact your manager before retrying.');
@@ -96,11 +101,8 @@ export function DeliveryProfile({ referenceId, opportunityId, vehicle, allowSold
     {selling && <form onSubmit={sold} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5" aria-label="Sold handoff form">
       <h3 className="font-semibold text-slate-900">Sold · Delivery handoff</h3>
       <p className="text-sm text-slate-600">Record what was agreed with the customer so Delivery can take over.</p>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="space-y-1 text-sm">Vehicle VIN<input aria-label="Vehicle VIN" required={!factory} maxLength={40} value={vin} onChange={e => setVin(e.target.value)} className={inputClass}/></label>
-        <label className="space-y-1 text-sm">Sale type<select value={saleType} onChange={e => setSaleType(e.target.value)} className={inputClass}>{['Retail','Lease','Novated','Fleet','Government','Rental','Cash','Demo','Other'].map(v => <option key={v}>{v}</option>)}</select></label>
-      </div>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={factory} onChange={e => setFactory(e.target.checked)}/>Factory order — VIN not yet allocated</label>
+      <InventoryVinPicker site={profile?.site || selectedSite} value={{ stockId: selectedStockId, vin, tba: vinTba }} onChange={selection => { setSelectedStockId(selection.stockId); setVin(selection.vin); setVinTba(selection.tba); }}/>
+      <label className="block text-sm">Sale type<select value={saleType} onChange={e => setSaleType(e.target.value)} className={inputClass}>{['Retail','Lease','Novated','Fleet','Government','Rental','Cash','Demo','Other'].map(v => <option key={v}>{v}</option>)}</select></label>
       {(Object.keys(labels) as (keyof typeof initial)[]).map(key => <label key={key} className="block space-y-1 text-sm"><span>{labels[key]}</span>
         {key === 'payment_method' ? <select className={inputClass} value={handoff[key]} onChange={e => setHandoff({ ...handoff, [key]: e.target.value })}>{['Cash','Finance','Lease','Novated lease','Other'].map(value => <option key={value}>{value}</option>)}</select>
           : <textarea className={inputClass} rows={key === 'delivery_notes' || key === 'promises' ? 3 : 2} maxLength={2000} required={key === 'promises' || key === 'lead_time' || key === 'finance_provider' && ['Finance','Lease','Novated lease'].includes(handoff.payment_method)} value={handoff[key]} onChange={e => setHandoff({ ...handoff, [key]: e.target.value })} placeholder={key === 'promises' ? 'List agreed promises, or enter None.' : undefined}/>}</label>)}

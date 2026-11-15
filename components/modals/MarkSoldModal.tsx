@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Opportunity, SaleType } from '@/lib/types';
 import { useCrm } from '@/lib/crmContext';
+import { InventoryVinPicker } from '@/components/customer/InventoryVinPicker';
 
 interface MarkSoldModalProps {
   isOpen: boolean;
@@ -23,7 +24,7 @@ interface MarkSoldModalProps {
 }
 
 export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalProps) {
-  const { vyStock, currentUser, executeMarkSold } = useCrm();
+  const { currentUser, executeMarkSold } = useCrm();
 
   const [vin, setVin] = useState('');
   const [selectedStockId, setSelectedStockId] = useState('');
@@ -37,7 +38,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
   const [leadTime, setLeadTime] = useState('');
   const [provider, setProvider] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
-  const [isFactoryOrder, setIsFactoryOrder] = useState(false);
+  const [vinTba, setVinTba] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -47,24 +48,9 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
       setError(''); setPromises(''); setLeadTime(''); setProvider(''); setDeliveryNotes(''); setFinanceMethod('Finance');
       setSaleType(opportunity.sale_type || 'Retail');
       setPrimarySalesperson(opportunity.owner_name || currentUser.name);
-      setIsFactoryOrder(opportunity.order_type === 'Factory Order');
-      if (opportunity.vy_stock_id) {
-        setSelectedStockId(opportunity.vy_stock_id);
-        const matched = vyStock.find((s) => s.stock_id === opportunity.vy_stock_id);
-        if (matched) setVin(matched.vin);
-      } else {
-        const available = vyStock.find(
-          (s) => s.model === opportunity.model && (s.status === 'Available' || s.status === 'Held')
-        );
-        if (available) {
-          setSelectedStockId(available.stock_id);
-          setVin(available.vin);
-        } else if (opportunity.order_type === 'Factory Order') {
-          setVin('');
-        } else {
-          setVin('');
-        }
-      }
+      setSelectedStockId(opportunity.vy_stock_id || '');
+      setVin(opportunity.vin || '');
+      setVinTba(opportunity.vin === 'TBA' || opportunity.order_type === 'Factory Order');
     }
   }, [opportunity?.opportunity_id, isOpen]);
 
@@ -72,23 +58,23 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vin.trim() && !isFactoryOrder) {
-      alert('Please enter a vehicle VIN or check "Factory Order Slot" (§7.5, Step 1).');
+    if (!vinTba && (!selectedStockId || !vin.trim())) {
+      setError('Select an inventory vehicle with a VIN, or choose TBA.');
       return;
     }
 
     setIsSubmitting(true);
     try {
       const result = await executeMarkSold(opportunity.opportunity_id, {
-        vin: vin.trim() || (isFactoryOrder ? 'FACTORY_ORDER_PENDING' : ''),
-        vy_stock_id: selectedStockId || undefined,
+        vin: vinTba ? '' : vin.trim(),
+        vin_tba: vinTba,
+        vy_stock_id: vinTba ? undefined : selectedStockId || undefined,
         sale_type: saleType,
         primary_salesperson: primarySalesperson,
         secondary_salesperson: secondarySalesperson || undefined,
         deposit: parseFloat(deposit) || 0,
         finance_method: financeMethod,
         delivery_handoff: { promises, lead_time: leadTime, payment_method: financeMethod, finance_provider: provider, delivery_notes: deliveryNotes },
-        is_factory_order: isFactoryOrder,
       });
       if (result.success) onClose();
       else setError(result.message);
@@ -126,7 +112,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
                 Sold · Delivery handoff
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-1">
-                {opportunity.vehicle_descriptor} · {opportunity.customer_name} (${opportunity.total_deal_value.toLocaleString()})
+                {opportunity.vehicle_descriptor} · {opportunity.customer_name} (${Number(opportunity.total_deal_value || 0).toLocaleString()})
               </p>
             </div>
           </div>
@@ -141,70 +127,13 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5 flex-1">
           {error && <p role="alert" className="p-3 rounded-lg bg-red-50 text-red-800 text-sm">{error}</p>}
-          {/* Stock & VIN Selection */}
-          <div className="space-y-3">
-            <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex flex-col sm:flex-row sm:items-center justify-between gap-1 font-mono">
-              <span>Vehicle Identification & Stock Unit *</span>
-              <span className="text-[10px] text-slate-500 font-normal">Mandatory for Delivery & Sales Log</span>
-            </label>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <span className="text-[11px] font-medium text-slate-600 block mb-1">
-                  Virtual Yard Stock Picker
-                </span>
-                <select
-                  value={selectedStockId}
-                  onChange={(e) => {
-                    const sid = e.target.value;
-                    setSelectedStockId(sid);
-                    const matched = vyStock.find((s) => s.stock_id === sid);
-                    if (matched) setVin(matched.vin);
-                  }}
-                  className="w-full text-xs font-medium p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-slate-400 outline-none"
-                >
-                  <option value="">-- Choose Stock or Factory Order --</option>
-                  {vyStock.map((s) => (
-                    <option key={s.stock_id} value={s.stock_id}>
-                      {s.stock_id} · {s.model} {s.variant} ({s.colour}) - {s.status}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <span className="text-[11px] font-medium text-slate-600 block mb-1">
-                  Vehicle VIN Number *
-                </span>
-                <input
-                  type="text"
-                  required={!isFactoryOrder}
-                  value={vin}
-                  onChange={(e) => setVin(e.target.value)}
-                  placeholder={isFactoryOrder ? 'Optional for Factory Order slot' : 'e.g. 6T1BYD779X2910488'}
-                  className="w-full text-xs font-mono uppercase p-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-slate-400 outline-none font-semibold text-slate-900"
-                />
-                <label className="flex items-center gap-2 mt-1.5 cursor-pointer text-[11px] text-slate-600 font-medium">
-                  <input
-                    type="checkbox"
-                    checked={isFactoryOrder}
-                    onChange={(e) => {
-                      setIsFactoryOrder(e.target.checked);
-                      if (e.target.checked && !vin) setVin('FACTORY_ORDER_PENDING');
-                    }}
-                    className="w-3.5 h-3.5 text-[#e60012] rounded border-slate-300"
-                  />
-                  <span>Factory Order Slot (VIN not yet allocated / Slotted for OEM build)</span>
-                </label>
-              </div>
-            </div>
-          </div>
+          <InventoryVinPicker site={opportunity.site} value={{ stockId: selectedStockId, vin, tba: vinTba }} onChange={selection => { setSelectedStockId(selection.stockId); setVin(selection.vin); setVinTba(selection.tba); }}/>
 
           {/* Sale Type & Finance Method */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="text-xs font-bold text-slate-800 uppercase tracking-wide block mb-1 font-mono">
-                Sale Type (Delivery Centre Enum) *
+                Sale type *
               </label>
               <select
                 value={saleType}
@@ -296,9 +225,9 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
           <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <strong className="block font-bold">Resilient Handover Compensation</strong>
+              <strong className="block font-bold">Delivery handoff</strong>
               <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
-                If the downstream Delivery Centre or Virtual Yard connector is temporarily degraded, the deal will be recorded locally and flagged as &ldquo;sync pending&rdquo;. Sales staff are never blocked from completing the deal on the floor.
+                The agreed details are saved on the customer profile for Delivery. If a connection is unavailable, the sale is flagged as pending so your manager can follow up.
               </p>
             </div>
           </div>
@@ -318,7 +247,7 @@ export function MarkSoldModal({ isOpen, onClose, opportunity }: MarkSoldModalPro
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#e60012] hover:bg-[#c91c2f] text-white font-bold text-xs shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 uppercase tracking-wider font-mono disabled:opacity-50 text-center"
             >
               <Sparkles className="w-4 h-4" />
-              <span>{isSubmitting ? 'Orchestrating Deal...' : 'Execute Mark Sold'}</span>
+              <span>{isSubmitting ? 'Saving…' : 'Confirm Sold & send handoff'}</span>
             </button>
           </div>
         </form>
